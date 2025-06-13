@@ -3,18 +3,25 @@ package io.celox.hexpulse.network;
 import android.util.Log;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.TimeUnit;
 
 import io.socket.client.IO;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
-import okhttp3.*;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /**
  * Game client for online multiplayer functionality
@@ -75,12 +82,39 @@ public class GameClient {
      * Create a new game room
      */
     public void createRoom(Callback callback) {
+        String url = BASE_URL + API_PATH + "/rooms";
+        Log.d(TAG, "Creating room with URL: " + url);
+        
         Request request = new Request.Builder()
-            .url(BASE_URL + API_PATH + "/rooms")
+            .url(url)
             .post(RequestBody.create("{}", MediaType.parse("application/json")))
             .build();
             
-        httpClient.newCall(request).enqueue(callback);
+        httpClient.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e(TAG, "Create room request failed", e);
+                callback.onFailure(call, e);
+            }
+            
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                Log.d(TAG, "Create room response code: " + response.code());
+                if (response.body() != null) {
+                    String responseBody = response.body().string();
+                    Log.d(TAG, "Create room response body: " + responseBody);
+                    
+                    // Recreate response for callback since body can only be read once
+                    Response newResponse = response.newBuilder()
+                        .body(ResponseBody.create(responseBody, response.body().contentType()))
+                        .build();
+                    callback.onResponse(call, newResponse);
+                } else {
+                    Log.d(TAG, "Create room response body is null");
+                    callback.onResponse(call, response);
+                }
+            }
+        });
     }
     
     /**
@@ -105,6 +139,7 @@ public class GameClient {
             options.reconnection = true;
             options.reconnectionAttempts = 5;
             options.reconnectionDelay = 1000;
+            options.path = "/hexpulse-socket.io/";
             
             socket = IO.socket(URI.create(BASE_URL), options);
             setupSocketListeners();

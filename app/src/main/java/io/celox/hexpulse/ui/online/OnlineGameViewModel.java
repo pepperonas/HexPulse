@@ -104,39 +104,48 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
     // Room management methods
     public void createRoom() {
         if (connectionStatus.getValue() != ConnectionStatus.CONNECTED) {
-            errorMessage.setValue("Not connected to server");
+            errorMessage.postValue("Not connected to server");
             return;
         }
 
-        isLoading.setValue(true);
-        statusMessage.setValue("Creating room...");
+        isLoading.postValue(true);
+        statusMessage.postValue("Creating room...");
 
         gameClient.createRoom(new Callback() {
             @Override
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                Log.e(TAG, "Failed to create room", e);
+                Log.e(TAG, "Failed to create room - Network error", e);
                 isLoading.postValue(false);
-                errorMessage.postValue("Failed to create room: " + e.getMessage());
+                errorMessage.postValue("Network error: " + e.getMessage());
             }
 
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
                 isLoading.postValue(false);
+                Log.d(TAG, "Create room response code: " + response.code());
+                
                 if (response.isSuccessful() && response.body() != null) {
                     try {
                         String responseBody = response.body().string();
+                        Log.d(TAG, "Create room response body: " + responseBody);
                         JSONObject jsonResponse = new JSONObject(responseBody);
                         String roomCode = jsonResponse.getString("roomCode");
                         
+                        Log.d(TAG, "Room created successfully with code: " + roomCode);
                         // Join the created room as host
                         joinRoom(roomCode, true);
                         
                     } catch (JSONException e) {
                         Log.e(TAG, "Error parsing create room response", e);
-                        errorMessage.postValue("Error creating room: Invalid response");
+                        errorMessage.postValue("Error creating room: Invalid response format");
                     }
                 } else {
-                    errorMessage.postValue("Failed to create room: Server error");
+                    String errorBody = "";
+                    if (response.body() != null) {
+                        errorBody = response.body().string();
+                    }
+                    Log.e(TAG, "Create room failed - Response code: " + response.code() + ", Body: " + errorBody);
+                    errorMessage.postValue("Server error (Code: " + response.code() + "): " + errorBody);
                 }
             }
         });
@@ -148,17 +157,17 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
 
     private void joinRoom(String roomCode, boolean asHost) {
         if (connectionStatus.getValue() != ConnectionStatus.CONNECTED) {
-            errorMessage.setValue("Not connected to server");
+            errorMessage.postValue("Not connected to server");
             return;
         }
 
         if (roomCode == null || roomCode.trim().isEmpty()) {
-            errorMessage.setValue("Please enter a room code");
+            errorMessage.postValue("Please enter a room code");
             return;
         }
 
-        isLoading.setValue(true);
-        statusMessage.setValue("Joining room...");
+        isLoading.postValue(true);
+        statusMessage.postValue("Joining room...");
 
         gameClient.joinRoom(roomCode.toUpperCase().trim(), playerId, asHost);
     }
