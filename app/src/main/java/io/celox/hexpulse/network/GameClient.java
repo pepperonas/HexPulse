@@ -134,6 +134,14 @@ public class GameClient {
      */
     public void connect() {
         try {
+            // Disconnect existing socket if present
+            if (socket != null) {
+                Log.d(TAG, "Disconnecting existing socket before reconnecting");
+                socket.disconnect();
+                socket.off();
+            }
+            
+            Log.d(TAG, "Creating new socket connection to " + BASE_URL);
             IO.Options options = new IO.Options();
             options.transports = new String[]{"websocket"};
             options.reconnection = true;
@@ -142,8 +150,11 @@ public class GameClient {
             options.path = "/hexpulse-socket.io/";
             
             socket = IO.socket(URI.create(BASE_URL), options);
+            Log.d(TAG, "Socket created: " + (socket != null));
+            
             setupSocketListeners();
             socket.connect();
+            Log.d(TAG, "Socket connection initiated");
             
         } catch (Exception e) {
             Log.e(TAG, "Socket connection error", e);
@@ -184,8 +195,42 @@ public class GameClient {
      * Make a move
      */
     public void makeMove(JSONObject move) {
-        if (socket == null || !socket.connected()) {
-            return;
+        Log.d(TAG, "makeMove called - socket: " + (socket != null) + 
+            ", roomCode: " + currentRoomCode + ", playerId: " + playerId);
+            
+        if (socket == null) {
+            Log.e(TAG, "Cannot make move - socket is null, attempting to reconnect");
+            connect();
+            
+            // Wait a bit for connection
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            
+            if (socket == null) {
+                Log.e(TAG, "Cannot make move - socket still null after reconnect attempt");
+                return;
+            }
+        }
+        
+        if (!socket.connected()) {
+            Log.w(TAG, "Socket not connected, attempting to reconnect...");
+            socket.connect();
+            // Wait a bit and retry
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            
+            if (!socket.connected()) {
+                Log.e(TAG, "Cannot make move - socket connection failed after retry");
+                return;
+            }
         }
         
         try {
@@ -194,7 +239,9 @@ public class GameClient {
             data.put("playerId", playerId);
             data.put("move", move);
             
+            Log.d(TAG, "Emitting make-move event: " + data);
             socket.emit("make-move", data);
+            Log.d(TAG, "make-move event emitted successfully");
         } catch (JSONException e) {
             Log.e(TAG, "Error making move", e);
         }
@@ -305,6 +352,15 @@ public class GameClient {
             socket.off();
             socket = null;
         }
+        // Note: Don't clear room info unless explicitly resetting
+        // This allows reconnection with same room/player data
+    }
+    
+    /**
+     * Reset all connection and room state
+     */
+    public void reset() {
+        disconnect();
         currentRoomCode = null;
         playerId = null;
         playerColor = null;
@@ -502,6 +558,14 @@ public class GameClient {
                 }
             }
         });
+    }
+    
+    // Setters
+    public void setRoomInfo(String roomCode, String playerId, boolean isHost) {
+        Log.d(TAG, "setRoomInfo called - roomCode: " + roomCode + ", playerId: " + playerId + ", isHost: " + isHost);
+        this.currentRoomCode = roomCode;
+        this.playerId = playerId;
+        this.isHost = isHost;
     }
     
     // Getters

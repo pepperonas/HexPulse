@@ -39,6 +39,30 @@ public class Hex {
     }
     
     /**
+     * Parse a Hex from its string representation
+     */
+    public static Hex fromString(String str) {
+        if (str == null || str.trim().isEmpty()) return null;
+        
+        try {
+            // Parse format "Hex(q, r)"
+            String clean = str.trim();
+            if (clean.startsWith("Hex(") && clean.endsWith(")")) {
+                String coords = clean.substring(4, clean.length() - 1);
+                String[] parts = coords.split(",");
+                if (parts.length == 2) {
+                    int q = Integer.parseInt(parts[0].trim());
+                    int r = Integer.parseInt(parts[1].trim());
+                    return new Hex(q, r);
+                }
+            }
+        } catch (NumberFormatException e) {
+            // Return null on parse error
+        }
+        return null;
+    }
+    
+    /**
      * Calculate distance between two hexagons
      */
     public int distance(Hex other) {

@@ -96,7 +96,7 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
     }
 
     public void disconnect() {
-        gameClient.disconnect();
+        gameClient.reset();
         connectionStatus.setValue(ConnectionStatus.DISCONNECTED);
         resetRoomState();
     }
@@ -130,9 +130,14 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
                         Log.d(TAG, "Create room response body: " + responseBody);
                         JSONObject jsonResponse = new JSONObject(responseBody);
                         String roomCode = jsonResponse.getString("roomCode");
+                        String serverPlayerId = jsonResponse.getString("playerId");
                         
-                        Log.d(TAG, "Room created successfully with code: " + roomCode);
-                        // Join the created room as host
+                        // Use the server-generated player ID
+                        playerId = serverPlayerId;
+                        Log.d(TAG, "Room created successfully with code: " + roomCode + ", playerId: " + playerId);
+                        
+                        // Set host status and join the room
+                        isHost.postValue(true);
                         joinRoom(roomCode, true);
                         
                     } catch (JSONException e) {
@@ -166,6 +171,12 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
             return;
         }
 
+        // Generate a new player ID for joining (if not already set by createRoom)
+        if (!asHost) {
+            playerId = "Player_" + UUID.randomUUID().toString().substring(0, 8);
+            Log.d(TAG, "Generated new playerId for joining: " + playerId);
+        }
+
         isLoading.postValue(true);
         statusMessage.postValue("Joining room...");
 
@@ -173,7 +184,7 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
     }
 
     public void leaveRoom() {
-        gameClient.disconnect();
+        gameClient.reset();
         resetRoomState();
         
         // Reconnect to server
@@ -213,6 +224,7 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
 
     @Override
     public void onRoomJoined(String roomCode, String playerColor) {
+        Log.d(TAG, "onRoomJoined - roomCode: " + roomCode + ", playerColor: " + playerColor);
         isLoading.postValue(false);
         currentRoomCode.postValue(roomCode);
         isInRoom.postValue(true);
@@ -328,6 +340,6 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
     protected void onCleared() {
         super.onCleared();
         gameClient.setEventListener(null);
-        gameClient.disconnect();
+        gameClient.reset();
     }
 }
