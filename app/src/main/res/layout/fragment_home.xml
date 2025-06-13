@@ -51,6 +51,15 @@
             style="@style/AbaloneButton" />
 
         <Button
+            android:id="@+id/btn_online_multiplayer"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginBottom="16dp"
+            android:text="@string/online_multiplayer"
+            android:textSize="18sp"
+            style="@style/AbaloneButton" />
+
+        <Button
             android:id="@+id/btn_new_game"
             android:layout_width="match_parent"
             android:layout_height="60dp"

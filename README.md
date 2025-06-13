@@ -25,6 +25,9 @@ HexPulse ist eine Android-Implementierung des klassischen Strategiespiels Abalon
 - **Anpassbare Themes**: Classic, Dark, Ocean, Forest
 - **3D-Grafiken**: Realistische Kugeldarstellung mit Schatten und Glanzlichtern
 - **Touch-Steuerung**: Intuitive Kugelauswahl und Bewegung
+- **Erweiterte Visualisierung**: Bewegungspfeile, Zielindikatoren und Vorschau-Kugeln
+- **Flüssige Animationen**: 1-Sekunden-Bewegungsanimationen mit Easing-Funktionen
+- **Vergrößertes Spielbrett**: Optimierte Größe für bessere Spielbarkeit
 
 ### KI-System
 - **Asynchrone Verarbeitung**: Flüssiges Gameplay ohne UI-Blockierung
@@ -81,10 +84,14 @@ cd HexPulse
 ## 🎮 Spielanleitung
 
 ### Grundsteuerung
-1. **Kugel auswählen**: Tippe auf eine deiner Kugeln
+1. **Kugel auswählen**: Tippe auf eine deiner Kugeln (goldene Hervorhebung)
 2. **Mehrere Kugeln**: Tippe weitere Kugeln an (max. 3 in einer Linie)
-3. **Bewegung**: Tippe auf eine gültige Zielposition
-4. **Auswahl löschen**: Tippe "Clear" oder außerhalb der gültigen Bereiche
+3. **Gültige Züge**: Grün hervorgehobene Felder mit Zielindikatoren
+4. **Bewegungsvorschau**: Gestrichelte Pfeile zeigen Kugelverschiebungen
+5. **Bewegung**: Tippe auf eine gültige Zielposition
+6. **Animation**: Kugeln bewegen sich flüssig über das Brett (1 Sekunde)
+7. **Vorschau-Kugeln**: Semi-transparente Kugeln zeigen Endpositionen beim Hovern
+8. **Auswahl löschen**: Tippe "Clear" oder außerhalb der gültigen Bereiche
 
 ### Bewegungstypen
 - **Einzelkugel**: Bewege eine Kugel in jede Richtung
@@ -94,9 +101,10 @@ cd HexPulse
 
 ### Spielmodi
 - **PvP**: Abwechselndes Spiel zweier menschlicher Spieler
-- **vs KI**: Schwarzer Spieler (du) gegen weißen KI-Gegner
+- **vs KI**: Schwarzer Spieler (du) gegen weißen KI-Gegner mit animierten Zügen
 - **Reset**: Neues Spiel starten
 - **Clear**: Aktuelle Auswahl aufheben
+- **Während Animation**: Touch-Eingaben werden blockiert für flüssige Darstellung
 
 ## 🎨 Themes
 
@@ -174,6 +182,13 @@ io.celox.hexpulse/
 - Material Design Guidelines
 - Responsive Layout für verschiedene Bildschirmgrößen
 - Performante Custom Views ohne Memory Leaks
+
+### Animation-System
+- **Easing-Funktionen**: Smooth cubic in-out für natürliche Bewegung
+- **Frame-basiert**: 60 FPS Animation mit `invalidate()` Zyklen
+- **Thread-safe**: UI-Thread Animation mit proper Lifecycle-Management
+- **Interaktions-Blocking**: Touch-Events werden während Animation blockiert
+- **Callback-System**: `onAnimationComplete()` für sequenzielle Spiellogik
 
 ## 📄 Lizenz
 

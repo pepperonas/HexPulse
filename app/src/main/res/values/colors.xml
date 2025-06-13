@@ -23,4 +23,19 @@
     <color name="marble_white">#FFF0F0F5</color>
     <color name="selection_highlight">#FFFFC107</color>
     <color name="valid_move_highlight">#FF66BB6A</color>
+    
+    <!-- Online Game Colors -->
+    <color name="card_background">#FF1A2332</color>
+    <color name="border_color">#FF3A4553</color>
+    <color name="input_background">#FF252E3E</color>
+    <color name="input_border">#FF4A5568</color>
+    <color name="room_code_background">#FF1E2D3D</color>
+    <color name="player_item_background">#FF242D3C</color>
+    <color name="accent_color">#FF4FC3F7</color>
+    <color name="success_color">#FF66BB6A</color>
+    <color name="danger_color">#FFEF5350</color>
+    <color name="warning_color">#FFFFC107</color>
+    <color name="red">#FFEF5350</color>
+    <color name="green">#FF66BB6A</color>
+    <color name="orange">#FFFFC107</color>
 </resources>

@@ -31,4 +31,12 @@
         <item name="cornerRadius">8dp</item>
         <item name="android:elevation">4dp</item>
     </style>
+    
+    <style name="AbaloneButton.Secondary" parent="AbaloneButton">
+        <item name="backgroundTint">@color/button_secondary</item>
+    </style>
+    
+    <style name="AbaloneButton.Danger" parent="AbaloneButton">
+        <item name="backgroundTint">@color/danger_color</item>
+    </style>
 </resources>

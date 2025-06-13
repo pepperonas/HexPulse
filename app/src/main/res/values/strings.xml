@@ -20,7 +20,7 @@
     <string name="current_player">Current Player: %s</string>
     <string name="black_player">Black</string>
     <string name="white_player">White</string>
-    <string name="score_format">%s: %d/6</string>
+    <string name="score_format" formatted="false">%s: %d/6</string>
     <string name="game_winner">%s Wins!</string>
     <string name="ai_thinking">AI is thinking...</string>
     <string name="theme_classic">Classic</string>
@@ -35,4 +35,34 @@
     <string name="reset_game">Reset</string>
     <string name="clear_selection">Clear</string>
     <string name="scores_display" formatted="false">Black: %d/6  White: %d/6</string>
+    
+    <!-- Online Game Strings -->
+    <string name="menu_online">Online Game</string>
+    <string name="online_multiplayer">Online Multiplayer</string>
+    <string name="create_room">Create Room</string>
+    <string name="join_room">Join Room</string>
+    <string name="room_code">Room Code</string>
+    <string name="enter_room_code">Enter room code</string>
+    <string name="share_room_code">Share Room Code</string>
+    <string name="connection_status">Connection Status</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="connecting">Connecting...</string>
+    <string name="waiting_for_players">Waiting for players...</string>
+    <string name="room_created">Room created successfully!</string>
+    <string name="room_joined">Joined room successfully!</string>
+    <string name="room_full">Room is full</string>
+    <string name="room_not_found">Room not found</string>
+    <string name="connection_failed">Connection failed</string>
+    <string name="share_room_link">Share Room Link</string>
+    <string name="room_link_format">Join my Abalone game: Room %s</string>
+    <string name="copy_room_code">Copy Room Code</string>
+    <string name="room_code_copied">Room code copied to clipboard</string>
+    <string name="start_game">Start Game</string>
+    <string name="leave_room">Leave Room</string>
+    <string name="player_joined">Player joined the room</string>
+    <string name="player_left">Player left the room</string>
+    <string name="you_are_host">You are the host</string>
+    <string name="waiting_for_host">Waiting for host to start the game</string>
+    <string name="game_starting">Game starting...</string>
 </resources>
