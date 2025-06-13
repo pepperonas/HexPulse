@@ -1,0 +1,38 @@
+<resources>
+    <string name="app_name">HexPulse</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="menu_home">Main Menu</string>
+    <string name="menu_gallery">Abalone Game</string>
+    <string name="menu_slideshow">Settings</string>
+    
+    <!-- Abalone Game Strings -->
+    <string name="game_title">Abalone</string>
+    <string name="new_game">New Game</string>
+    <string name="player_vs_player">Player vs Player</string>
+    <string name="player_vs_ai">Player vs AI</string>
+    <string name="settings">Settings</string>
+    <string name="current_player">Current Player: %s</string>
+    <string name="black_player">Black</string>
+    <string name="white_player">White</string>
+    <string name="score_format">%s: %d/6</string>
+    <string name="game_winner">%s Wins!</string>
+    <string name="ai_thinking">AI is thinking...</string>
+    <string name="theme_classic">Classic</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_ocean">Ocean</string>
+    <string name="theme_forest">Forest</string>
+    <string name="ai_easy">Easy</string>
+    <string name="ai_medium">Medium</string>
+    <string name="ai_hard">Hard</string>
+    <string name="sound_on">Sound On</string>
+    <string name="sound_off">Sound Off</string>
+    <string name="reset_game">Reset</string>
+    <string name="clear_selection">Clear</string>
+    <string name="scores_display" formatted="false">Black: %d/6  White: %d/6</string>
+</resources>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Abalone Game Colors -->
+    <color name="background_dark">#FF0F1423</color>
+    <color name="background_light">#FF2D3748</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFE2E8F0</color>
+    <color name="accent_primary">#FF66BB6A</color>
+    <color name="accent_secondary">#FF42A5F5</color>
+    <color name="button_primary">#FF3F51B5</color>
+    <color name="button_secondary">#FF303F9F</color>
+    <color name="board_background">#FF2D374B</color>
+    <color name="board_border">#FF1A202C</color>
+    <color name="marble_black">#FF1E1E25</color>
+    <color name="marble_white">#FFF0F0F5</color>
+    <color name="selection_highlight">#FFFFC107</color>
+    <color name="valid_move_highlight">#FF66BB6A</color>
+</resources>
