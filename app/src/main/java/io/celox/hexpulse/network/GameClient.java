@@ -31,7 +31,7 @@ public class GameClient {
     private static final String BASE_URL = "https://mrx3k1.de";
     private static final String API_PATH = "/api/hexpulse";
     
-    private static GameClient instance;
+    private static volatile GameClient instance;
     private Socket socket;
     private OkHttpClient httpClient;
     private Gson gson;
@@ -60,6 +60,7 @@ public class GameClient {
     }
     
     private GameClient() {
+        Log.d(TAG, "GameClient constructor called - creating new instance: " + this.hashCode());
         httpClient = new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
@@ -69,8 +70,18 @@ public class GameClient {
     
     public static GameClient getInstance() {
         if (instance == null) {
-            instance = new GameClient();
+            synchronized (GameClient.class) {
+                if (instance == null) {
+                    Log.d(TAG, "Creating new GameClient instance");
+                    instance = new GameClient();
+                } else {
+                    Log.d(TAG, "Using existing GameClient instance from synchronized block");
+                }
+            }
+        } else {
+            Log.d(TAG, "Using existing GameClient instance: " + instance.hashCode());
         }
+        Log.d(TAG, "getInstance() returning instance: " + instance.hashCode());
         return instance;
     }
     
@@ -83,7 +94,10 @@ public class GameClient {
      */
     public void createRoom(Callback callback) {
         String url = BASE_URL + API_PATH + "/rooms";
+        Log.d(TAG, "=== CREATE ROOM START ===");
         Log.d(TAG, "Creating room with URL: " + url);
+        Log.d(TAG, "Current connection state: " + (socket != null ? "socket exists" : "no socket") + 
+                   ", connected: " + isConnected());
         
         Request request = new Request.Builder()
             .url(url)
@@ -134,27 +148,55 @@ public class GameClient {
      */
     public void connect() {
         try {
-            // Disconnect existing socket if present
+            Log.d(TAG, "=== CONNECT START ===");
+            Log.d(TAG, "connect() - CURRENT STATE: roomCode=" + currentRoomCode + ", playerId=" + playerId + ", isHost=" + isHost);
+            
+            // Store current room state before reconnecting - CRITICAL for preserving state
+            String savedRoomCode = currentRoomCode;
+            String savedPlayerId = playerId;
+            String savedPlayerColor = playerColor;
+            boolean savedIsHost = isHost;
+            
+            Log.d(TAG, "connect() - SAVED STATE: roomCode=" + savedRoomCode + ", playerId=" + savedPlayerId + ", isHost=" + savedIsHost);
+            
+            // Disconnect existing socket if present (but don't clear state variables)
             if (socket != null) {
-                Log.d(TAG, "Disconnecting existing socket before reconnecting");
+                Log.d(TAG, "connect() - Disconnecting existing socket before reconnecting");
                 socket.disconnect();
                 socket.off();
+                socket = null; // Explicitly set to null for cleanup
+            } else {
+                Log.d(TAG, "connect() - No existing socket to disconnect");
             }
             
-            Log.d(TAG, "Creating new socket connection to " + BASE_URL);
+            Log.d(TAG, "connect() - Creating new socket connection to " + BASE_URL);
             IO.Options options = new IO.Options();
-            options.transports = new String[]{"websocket"};
+            options.transports = new String[]{"websocket", "polling"};
             options.reconnection = true;
             options.reconnectionAttempts = 5;
             options.reconnectionDelay = 1000;
-            options.path = "/hexpulse-socket.io/";
+            options.timeout = 20000; // 20 second timeout
+            options.path = "/socket.io/"; // Use default path until nginx is configured
             
             socket = IO.socket(URI.create(BASE_URL), options);
-            Log.d(TAG, "Socket created: " + (socket != null));
+            Log.d(TAG, "connect() - Socket created: " + (socket != null));
+            
+            // CRITICAL: Restore room state after creating new socket
+            // This ensures room info survives socket reconnections
+            if (savedRoomCode != null && savedPlayerId != null) {
+                currentRoomCode = savedRoomCode;
+                playerId = savedPlayerId;
+                playerColor = savedPlayerColor;
+                isHost = savedIsHost;
+                Log.d(TAG, "connect() - RESTORED STATE: roomCode=" + currentRoomCode + ", playerId=" + playerId + ", isHost=" + isHost);
+            } else {
+                Log.d(TAG, "connect() - NO STATE TO RESTORE: savedRoomCode=" + savedRoomCode + ", savedPlayerId=" + savedPlayerId);
+            }
             
             setupSocketListeners();
             socket.connect();
-            Log.d(TAG, "Socket connection initiated");
+            Log.d(TAG, "connect() - Socket connection initiated");
+            Log.d(TAG, "=== CONNECT END ===");
             
         } catch (Exception e) {
             Log.e(TAG, "Socket connection error", e);
@@ -168,16 +210,23 @@ public class GameClient {
      * Join a game room
      */
     public void joinRoom(String roomCode, String playerId, boolean isHost) {
+        Log.d(TAG, "=== JOIN ROOM START ===");
+        Log.d(TAG, "joinRoom - socket: " + (socket != null) + ", connected: " + (socket != null && socket.connected()));
+        
         if (socket == null || !socket.connected()) {
+            Log.e(TAG, "joinRoom - FAILED: Not connected to server");
             if (eventListener != null) {
                 eventListener.onError("Not connected to server");
             }
             return;
         }
         
+        // Store room info
         this.currentRoomCode = roomCode;
         this.playerId = playerId;
         this.isHost = isHost;
+        
+        Log.d(TAG, "joinRoom called - storing roomCode: " + roomCode + ", playerId: " + playerId + ", isHost: " + isHost);
         
         try {
             JSONObject data = new JSONObject();
@@ -185,21 +234,27 @@ public class GameClient {
             data.put("playerId", playerId);
             data.put("isHost", isHost);
             
+            Log.d(TAG, "joinRoom - EMITTING join-room event with data: " + data.toString());
             socket.emit("join-room", data);
+            Log.d(TAG, "joinRoom - join-room event emitted successfully");
         } catch (JSONException e) {
             Log.e(TAG, "Error joining room", e);
         }
+        Log.d(TAG, "=== JOIN ROOM END ===");
     }
     
     /**
      * Make a move
      */
     public void makeMove(JSONObject move) {
-        Log.d(TAG, "makeMove called - socket: " + (socket != null) + 
-            ", roomCode: " + currentRoomCode + ", playerId: " + playerId);
+        Log.d(TAG, "=== MAKE MOVE START ===");
+        Log.d(TAG, "makeMove - INSTANCE: " + this.hashCode());
+        Log.d(TAG, "makeMove - INPUT: move=" + move);
+        Log.d(TAG, "makeMove - SOCKET STATE: socket=" + (socket != null) + ", connected=" + (socket != null && socket.connected()));
+        Log.d(TAG, "makeMove - ROOM STATE: roomCode=" + currentRoomCode + ", playerId=" + playerId + ", isHost=" + isHost);
             
         if (socket == null) {
-            Log.e(TAG, "Cannot make move - socket is null, attempting to reconnect");
+            Log.e(TAG, "makeMove - CRITICAL: socket is null, attempting to reconnect");
             connect();
             
             // Wait a bit for connection
@@ -210,14 +265,16 @@ public class GameClient {
                 return;
             }
             
+            Log.d(TAG, "makeMove - AFTER RECONNECT: socket=" + (socket != null) + ", roomCode=" + currentRoomCode + ", playerId=" + playerId);
+            
             if (socket == null) {
-                Log.e(TAG, "Cannot make move - socket still null after reconnect attempt");
+                Log.e(TAG, "makeMove - FAILED: socket still null after reconnect attempt");
                 return;
             }
         }
         
         if (!socket.connected()) {
-            Log.w(TAG, "Socket not connected, attempting to reconnect...");
+            Log.w(TAG, "makeMove - Socket not connected, attempting to reconnect...");
             socket.connect();
             // Wait a bit and retry
             try {
@@ -227,10 +284,19 @@ public class GameClient {
                 return;
             }
             
+            Log.d(TAG, "makeMove - AFTER SOCKET RECONNECT: connected=" + socket.connected());
+            
             if (!socket.connected()) {
-                Log.e(TAG, "Cannot make move - socket connection failed after retry");
+                Log.e(TAG, "makeMove - FAILED: socket connection failed after retry");
                 return;
             }
+        }
+        
+        // Check if we have valid room state - if missing, this indicates a critical bug
+        if (currentRoomCode == null || playerId == null) {
+            Log.e(TAG, "makeMove - CRITICAL: Missing room state! roomCode=" + currentRoomCode + ", playerId=" + playerId);
+            Log.e(TAG, "makeMove - This indicates room state was lost during socket operations");
+            return;
         }
         
         try {
@@ -239,12 +305,13 @@ public class GameClient {
             data.put("playerId", playerId);
             data.put("move", move);
             
-            Log.d(TAG, "Emitting make-move event: " + data);
+            Log.d(TAG, "makeMove - EMITTING: " + data);
             socket.emit("make-move", data);
-            Log.d(TAG, "make-move event emitted successfully");
+            Log.d(TAG, "makeMove - SUCCESS: move emitted successfully");
         } catch (JSONException e) {
-            Log.e(TAG, "Error making move", e);
+            Log.e(TAG, "makeMove - ERROR: JSON creation failed", e);
         }
+        Log.d(TAG, "=== MAKE MOVE END ===");
     }
     
     /**
@@ -360,11 +427,16 @@ public class GameClient {
      * Reset all connection and room state
      */
     public void reset() {
+        Log.d(TAG, "=== RESET CALLED ===");
+        Log.d(TAG, "reset() - BEFORE: roomCode=" + currentRoomCode + ", playerId=" + playerId + ", isHost=" + isHost);
+        Log.d(TAG, "reset() - Stack trace:", new Exception("Reset called from"));
         disconnect();
         currentRoomCode = null;
         playerId = null;
         playerColor = null;
         isHost = false;
+        Log.d(TAG, "reset() - AFTER: roomCode=" + currentRoomCode + ", playerId=" + playerId + ", isHost=" + isHost);
+        Log.d(TAG, "=== RESET END ===");
     }
     
     /**
@@ -374,7 +446,9 @@ public class GameClient {
         socket.on(Socket.EVENT_CONNECT, new Emitter.Listener() {
             @Override
             public void call(Object... args) {
-                Log.d(TAG, "Connected to server");
+                Log.d(TAG, "=== SOCKET CONNECTED ===");
+                Log.d(TAG, "Connected to server successfully");
+                Log.d(TAG, "Socket ID: " + socket.id());
                 if (eventListener != null) {
                     eventListener.onConnected();
                 }
@@ -384,9 +458,23 @@ public class GameClient {
         socket.on(Socket.EVENT_DISCONNECT, new Emitter.Listener() {
             @Override
             public void call(Object... args) {
+                Log.d(TAG, "=== SOCKET DISCONNECTED ===");
                 Log.d(TAG, "Disconnected from server");
                 if (eventListener != null) {
                     eventListener.onDisconnected();
+                }
+            }
+        });
+        
+        socket.on(Socket.EVENT_CONNECT_ERROR, new Emitter.Listener() {
+            @Override
+            public void call(Object... args) {
+                Log.e(TAG, "=== SOCKET CONNECTION ERROR ===");
+                if (args.length > 0) {
+                    Log.e(TAG, "Connection error: " + args[0]);
+                }
+                if (eventListener != null) {
+                    eventListener.onError("Connection failed: " + (args.length > 0 ? args[0] : "Unknown error"));
                 }
             }
         });
@@ -438,17 +526,31 @@ public class GameClient {
         socket.on("move-made", new Emitter.Listener() {
             @Override
             public void call(Object... args) {
+                Log.d(TAG, "=== MOVE-MADE EVENT RECEIVED ===");
+                Log.d(TAG, "move-made - args length: " + args.length);
+                if (args.length > 0) {
+                    Log.d(TAG, "move-made - args[0]: " + args[0]);
+                }
                 try {
                     JSONObject data = (JSONObject) args[0];
                     String playerId = data.getString("playerId");
                     JSONObject move = data.getJSONObject("move");
                     
+                    Log.d(TAG, "move-made - parsed successfully - playerId: " + playerId + ", move: " + move);
+                    
                     if (eventListener != null) {
+                        Log.d(TAG, "move-made - calling eventListener.onMoveMade()");
                         eventListener.onMoveMade(playerId, move);
+                        Log.d(TAG, "move-made - eventListener.onMoveMade() completed");
+                    } else {
+                        Log.w(TAG, "move-made - eventListener is null!");
                     }
                 } catch (JSONException e) {
                     Log.e(TAG, "Error parsing move-made", e);
+                } catch (Exception e) {
+                    Log.e(TAG, "Unexpected error in move-made listener", e);
                 }
+                Log.d(TAG, "=== MOVE-MADE EVENT END ===");
             }
         });
         
@@ -562,15 +664,26 @@ public class GameClient {
     
     // Setters
     public void setRoomInfo(String roomCode, String playerId, boolean isHost) {
-        Log.d(TAG, "setRoomInfo called - roomCode: " + roomCode + ", playerId: " + playerId + ", isHost: " + isHost);
+        Log.d(TAG, "=== setRoomInfo START ===");
+        Log.d(TAG, "setRoomInfo - INSTANCE: " + this.hashCode());
+        Log.d(TAG, "setRoomInfo - BEFORE: currentRoomCode=" + this.currentRoomCode + ", playerId=" + this.playerId + ", isHost=" + this.isHost);
+        Log.d(TAG, "setRoomInfo - SETTING: roomCode=" + roomCode + ", playerId=" + playerId + ", isHost=" + isHost);
         this.currentRoomCode = roomCode;
         this.playerId = playerId;
         this.isHost = isHost;
+        Log.d(TAG, "setRoomInfo - AFTER: currentRoomCode=" + this.currentRoomCode + ", playerId=" + this.playerId + ", isHost=" + this.isHost);
+        Log.d(TAG, "=== setRoomInfo END ===");
     }
     
-    // Getters
-    public String getCurrentRoomCode() { return currentRoomCode; }
-    public String getPlayerId() { return playerId; }
+    // Getters with debugging
+    public String getCurrentRoomCode() { 
+        Log.d(TAG, "getCurrentRoomCode() called - returning: " + currentRoomCode + " (instance: " + this.hashCode() + ")");
+        return currentRoomCode; 
+    }
+    public String getPlayerId() { 
+        Log.d(TAG, "getPlayerId() called - returning: " + playerId + " (instance: " + this.hashCode() + ")");
+        return playerId; 
+    }
     public String getPlayerColor() { return playerColor; }
     public boolean isHost() { return isHost; }
     public boolean isConnected() { return socket != null && socket.connected(); }

@@ -39,6 +39,7 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
 
     // Game state
     private MutableLiveData<Boolean> gameStarted = new MutableLiveData<>(false);
+    private MutableLiveData<JSONObject> opponentMove = new MutableLiveData<>();
 
     private GameClient gameClient;
     private String playerId;
@@ -66,6 +67,7 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
     public OnlineGameViewModel(@NonNull Application application) {
         super(application);
         gameClient = GameClient.getInstance();
+        Log.d(TAG, "OnlineGameViewModel - GameClient instance: " + gameClient.hashCode());
         gameClient.setEventListener(this);
         playerId = "Player_" + UUID.randomUUID().toString().substring(0, 8);
     }
@@ -81,15 +83,18 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
     public LiveData<Boolean> getIsInRoom() { return isInRoom; }
     public LiveData<Boolean> getIsLoading() { return isLoading; }
     public LiveData<Boolean> getGameStarted() { return gameStarted; }
+    public LiveData<JSONObject> getOpponentMove() { return opponentMove; }
 
     public String getPlayerId() { return playerId; }
 
     // Connection methods
     public void connect() {
         if (connectionStatus.getValue() == ConnectionStatus.CONNECTED) {
+            Log.d(TAG, "Already connected, skipping connect()");
             return;
         }
 
+        Log.d(TAG, "Starting connection to server...");
         connectionStatus.setValue(ConnectionStatus.CONNECTING);
         statusMessage.setValue("Connecting to server...");
         gameClient.connect();
@@ -136,6 +141,12 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
                         playerId = serverPlayerId;
                         Log.d(TAG, "Room created successfully with code: " + roomCode + ", playerId: " + playerId);
                         
+                        // Store room info in GameClient immediately
+                        Log.d(TAG, "=== STORING ROOM INFO IN GAMECLIENT (CREATE) ===");
+                        Log.d(TAG, "About to call setRoomInfo with: roomCode=" + roomCode + ", playerId=" + playerId + ", isHost=true");
+                        gameClient.setRoomInfo(roomCode, playerId, true);
+                        Log.d(TAG, "=== ROOM INFO STORED (CREATE) ===");
+                        
                         // Set host status and join the room
                         isHost.postValue(true);
                         joinRoom(roomCode, true);
@@ -176,11 +187,22 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
             playerId = "Player_" + UUID.randomUUID().toString().substring(0, 8);
             Log.d(TAG, "Generated new playerId for joining: " + playerId);
         }
+        
+        // Store room info in GameClient before joining
+        String finalRoomCode = roomCode.toUpperCase().trim();
+        Log.d(TAG, "=== STORING ROOM INFO IN GAMECLIENT (JOIN) ===");
+        Log.d(TAG, "About to call setRoomInfo with: roomCode=" + finalRoomCode + ", playerId=" + playerId + ", isHost=" + asHost);
+        gameClient.setRoomInfo(finalRoomCode, playerId, asHost);
+        Log.d(TAG, "=== ROOM INFO STORED (JOIN) ===");
 
         isLoading.postValue(true);
         statusMessage.postValue("Joining room...");
 
-        gameClient.joinRoom(roomCode.toUpperCase().trim(), playerId, asHost);
+        // Small delay to ensure socket is fully connected
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            Log.d(TAG, "Calling gameClient.joinRoom after delay");
+            gameClient.joinRoom(finalRoomCode, playerId, asHost);
+        }, 500);
     }
 
     public void leaveRoom() {
@@ -278,8 +300,10 @@ public class OnlineGameViewModel extends AndroidViewModel implements GameClient.
 
     @Override
     public void onMoveMade(String playerId, JSONObject move) {
-        // Handle move made by other player
-        // This would be forwarded to the game logic
+        Log.d(TAG, "onMoveMade - received move from " + playerId + ": " + move);
+        // Forward the move to GalleryFragment via LiveData
+        opponentMove.postValue(move);
+        statusMessage.postValue("Move received from opponent");
     }
 
     @Override

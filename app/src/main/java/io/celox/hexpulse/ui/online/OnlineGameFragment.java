@@ -237,9 +237,9 @@ public class OnlineGameFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        if (viewModel != null) {
-            viewModel.disconnect();
-        }
+        // DO NOT disconnect/reset GameClient here as it will clear room state
+        // needed by GalleryFragment when navigating to the game
+        // The GameClient should maintain state across fragment navigation
         binding = null;
     }
 }

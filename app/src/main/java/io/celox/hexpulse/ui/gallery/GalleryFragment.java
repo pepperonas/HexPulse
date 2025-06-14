@@ -9,16 +9,24 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
-import io.celox.hexpulse.R;
-import io.celox.hexpulse.databinding.FragmentGalleryBinding;
-import io.celox.hexpulse.game.*;
-import io.celox.hexpulse.network.GameClient;
-import io.celox.hexpulse.ui.views.HexagonalBoardView;
-
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import io.celox.hexpulse.R;
+import io.celox.hexpulse.databinding.FragmentGalleryBinding;
+import io.celox.hexpulse.game.AIDifficulty;
+import io.celox.hexpulse.game.AbaloneAI;
+import io.celox.hexpulse.game.AbaloneGame;
+import io.celox.hexpulse.game.Hex;
+import io.celox.hexpulse.game.Player;
+import io.celox.hexpulse.game.Theme;
+import io.celox.hexpulse.network.GameClient;
+import io.celox.hexpulse.ui.views.HexagonalBoardView;
 
 public class GalleryFragment extends Fragment implements HexagonalBoardView.BoardTouchListener, GameClient.GameEventListener {
 
@@ -28,6 +36,7 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     private String gameMode = "PVP"; // Default to Player vs Player
     private boolean isAiThinking = false;
     private Hex pendingMoveTarget = null; // Target position for pending move
+    private List<Hex> pendingSelectedMarbles = new ArrayList<>(); // Selected marbles for pending move
     
     // Online game variables
     private GameClient gameClient;
@@ -60,7 +69,10 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
                 
                 // Initialize GameClient
                 gameClient = GameClient.getInstance();
+                android.util.Log.d("GalleryFragment", "GalleryFragment - GameClient instance: " + gameClient.hashCode());
+                // CRITICAL: Set this as the event listener to receive move-made events
                 gameClient.setEventListener(this);
+                android.util.Log.d("GalleryFragment", "GalleryFragment set as GameClient event listener");
                 
                 // Set initial player color based on host status (will be updated by onRoomJoined)
                 myPlayerColor = isHost ? Player.BLACK : Player.WHITE;
@@ -69,24 +81,26 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
                 android.util.Log.d("GalleryFragment", "GameClient state - isConnected: " + gameClient.isConnected() + 
                     ", roomCode: " + gameClient.getCurrentRoomCode() + ", playerId: " + gameClient.getPlayerId());
                 
-                // Set room information in GameClient if not already set
-                if (gameClient.getCurrentRoomCode() == null || gameClient.getPlayerId() == null) {
-                    android.util.Log.d("GalleryFragment", "Setting room info in GameClient - roomCode: " + roomCode + ", playerId: " + playerId);
-                    gameClient.setRoomInfo(roomCode, playerId, isHost);
+                // Always set room information from fragment arguments
+                android.util.Log.d("GalleryFragment", "Setting room info in GameClient - roomCode: " + roomCode + ", playerId: " + playerId + ", isHost: " + isHost);
+                gameClient.setRoomInfo(roomCode, playerId, isHost);
+                
+                // Only reconnect if not connected
+                if (!gameClient.isConnected()) {
+                    android.util.Log.d("GalleryFragment", "Socket not connected, connecting...");
+                    gameClient.connect();
+                    
+                    // Wait a moment for connection to establish and rejoin room
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                        android.util.Log.d("GalleryFragment", "Post-connect check - isConnected: " + gameClient.isConnected());
+                        if (gameClient.isConnected()) {
+                            android.util.Log.d("GalleryFragment", "Rejoining room after reconnect");
+                            gameClient.joinRoom(roomCode, playerId, isHost);
+                        }
+                    }, 1000);
+                } else {
+                    android.util.Log.d("GalleryFragment", "Socket already connected, no reconnection needed");
                 }
-                
-                // Ensure socket connection is active - always try to connect for safety
-                android.util.Log.d("GalleryFragment", "Ensuring socket connection...");
-                gameClient.connect();
-                
-                // Wait a moment for connection to establish and rejoin room
-                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-                    android.util.Log.d("GalleryFragment", "Post-connect check - isConnected: " + gameClient.isConnected());
-                    if (gameClient.isConnected()) {
-                        android.util.Log.d("GalleryFragment", "Rejoining room after reconnect");
-                        gameClient.joinRoom(roomCode, playerId, isHost);
-                    }
-                }, 1000);
             }
         }
 
@@ -174,8 +188,9 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
                                 game.selectMarble(marble);
                             }
                             
-                            // Store target and animate AI move
+                            // Store target and selected marbles for animation
                             pendingMoveTarget = move.target;
+                            pendingSelectedMarbles = new ArrayList<>(move.selectedMarbles);
                             binding.hexagonalBoard.animateMove(move.selectedMarbles, move.target);
                         } else {
                             Toast.makeText(getContext(), "AI couldn't find a move", Toast.LENGTH_SHORT).show();
@@ -226,8 +241,9 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         else if (game.getValidMoves().contains(position)) {
             List<Hex> selectedMarbles = game.getSelectedMarbles();
             if (!selectedMarbles.isEmpty()) {
-                // Store target for later execution
+                // Store target and selected marbles for later execution
                 pendingMoveTarget = position;
+                pendingSelectedMarbles = new ArrayList<>(selectedMarbles); // Copy the list
                 // Start animation
                 binding.hexagonalBoard.animateMove(selectedMarbles, position);
                 // Move will be executed when animation completes
@@ -252,22 +268,36 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
                     
                 // Send move to server if in online mode
                 if (isOnlineGame && gameClient != null) {
-                    sendMoveToServer(pendingMoveTarget);
+                    sendMoveToServer(pendingMoveTarget, pendingSelectedMarbles);
                 }
                 pendingMoveTarget = null;
+                pendingSelectedMarbles.clear();
                 updateUI();
             } else {
                 Toast.makeText(getContext(), "Move execution failed", Toast.LENGTH_SHORT).show();
                 pendingMoveTarget = null;
+                pendingSelectedMarbles.clear();
             }
         }
     }
     
-    private void sendMoveToServer(Hex target) {
+    private void sendMoveToServer(Hex target, List<Hex> selectedMarbles) {
+        android.util.Log.d("GalleryFragment", "=== SEND MOVE TO SERVER START ===");
+        android.util.Log.d("GalleryFragment", "sendMoveToServer - INPUT: target=" + target);
+        android.util.Log.d("GalleryFragment", "sendMoveToServer - GAME STATE: isOnlineGame=" + isOnlineGame + ", myPlayerColor=" + myPlayerColor);
+        android.util.Log.d("GalleryFragment", "sendMoveToServer - CLIENT STATE: gameClient=" + (gameClient != null));
+        
+        if (gameClient != null) {
+            android.util.Log.d("GalleryFragment", "sendMoveToServer - GAMECLIENT INSTANCE: " + gameClient.hashCode());
+            android.util.Log.d("GalleryFragment", "sendMoveToServer - GAMECLIENT ROOM STATE: roomCode=" + 
+                gameClient.getCurrentRoomCode() + ", playerId=" + gameClient.getPlayerId() + 
+                ", isConnected=" + gameClient.isConnected());
+        }
+        
         // Only send move if we're in an online game and have a valid player color
         if (!isOnlineGame || myPlayerColor == null || gameClient == null) {
-            android.util.Log.d("GalleryFragment", "Not sending move - isOnlineGame: " + isOnlineGame + 
-                ", myPlayerColor: " + myPlayerColor + ", gameClient: " + (gameClient != null));
+            android.util.Log.w("GalleryFragment", "sendMoveToServer - SKIPPING: isOnlineGame=" + isOnlineGame + 
+                ", myPlayerColor=" + myPlayerColor + ", gameClient=" + (gameClient != null));
             return;
         }
         
@@ -276,19 +306,26 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
             moveData.put("target", target.toString());
             moveData.put("player", myPlayerColor.toString());
             
-            // Add selected marbles information
-            List<Hex> selectedMarbles = game.getSelectedMarbles();
-            moveData.put("selectedMarbles", selectedMarbles.toString());
+            // Add selected marbles information as JSON array
+            JSONArray marblesArray = new JSONArray();
+            for (Hex marble : selectedMarbles) {
+                marblesArray.put(marble.toString());
+            }
+            moveData.put("selectedMarbles", marblesArray);
+            moveData.put("marbleCount", selectedMarbles.size());
             
-            android.util.Log.d("GalleryFragment", "Sending move to server: " + moveData.toString());
+            android.util.Log.d("GalleryFragment", "sendMoveToServer - MOVE DATA: " + moveData);
+            android.util.Log.d("GalleryFragment", "sendMoveToServer - Selected marbles: " + selectedMarbles.size());
+            android.util.Log.d("GalleryFragment", "sendMoveToServer - CALLING gameClient.makeMove()");
             
             gameClient.makeMove(moveData);
             
-            android.util.Log.d("GalleryFragment", "Move sent to server successfully");
+            android.util.Log.d("GalleryFragment", "sendMoveToServer - SUCCESS: Move sent to server");
         } catch (JSONException e) {
-            android.util.Log.e("GalleryFragment", "Failed to create move JSON", e);
+            android.util.Log.e("GalleryFragment", "sendMoveToServer - ERROR: Failed to create move JSON", e);
             Toast.makeText(getContext(), "Failed to send move", Toast.LENGTH_SHORT).show();
         }
+        android.util.Log.d("GalleryFragment", "=== SEND MOVE TO SERVER END ===");
     }
 
     private void resetGame() {
@@ -364,56 +401,146 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
 
     @Override
     public void onMoveMade(String playerId, JSONObject move) {
+        android.util.Log.d("GalleryFragment", "=== GALLERYFRAGMENT MOVE-MADE RECEIVED ===");
+        android.util.Log.d("GalleryFragment", "onMoveMade - from playerId: " + playerId + ", move: " + move);
+        android.util.Log.d("GalleryFragment", "onMoveMade - my playerId: " + this.playerId);
+        
         // Only process moves from other players
         if (!this.playerId.equals(playerId)) {
+            android.util.Log.d("GalleryFragment", "onMoveMade - PROCESSING OPPONENT MOVE");
             if (getActivity() != null) {
                 getActivity().runOnUiThread(() -> {
                     try {
                         // Parse and execute opponent's move
+                        android.util.Log.d("GalleryFragment", "onMoveMade - EXECUTING OPPONENT MOVE");
                         executeOpponentMove(move);
                         updateUI();
+                        android.util.Log.d("GalleryFragment", "onMoveMade - OPPONENT MOVE EXECUTED AND UI UPDATED");
                     } catch (JSONException e) {
+                        android.util.Log.e("GalleryFragment", "onMoveMade - ERROR processing opponent move", e);
                         Toast.makeText(getContext(), "Error processing opponent's move", Toast.LENGTH_SHORT).show();
                     }
                 });
+            } else {
+                android.util.Log.w("GalleryFragment", "onMoveMade - Activity is null, cannot process move");
             }
+        } else {
+            android.util.Log.d("GalleryFragment", "onMoveMade - IGNORING OWN MOVE");
         }
+        android.util.Log.d("GalleryFragment", "=== GALLERYFRAGMENT MOVE-MADE END ===");
     }
     
     private void executeOpponentMove(JSONObject moveData) throws JSONException {
-        // Parse move data from server
+        android.util.Log.d("GalleryFragment", "executeOpponentMove - START");
+        
+        // BIG FAT TOAST TO SEE IF THIS IS CALLED
+        Toast.makeText(getContext(), "🔥 OPPONENT MOVE RECEIVED! 🔥", Toast.LENGTH_LONG).show();
+        
+        android.util.Log.d("GalleryFragment", "executeOpponentMove - moveData: " + moveData);
+        
+        // Parse the move and execute it on our local game
         String targetStr = moveData.getString("target");
-        String selectedMarblesStr = moveData.getString("selectedMarbles");
-        
-        // Parse target position
         Hex target = Hex.fromString(targetStr);
-        if (target == null) return;
         
-        // Parse selected marbles (simplified parsing)
-        List<Hex> selectedMarbles = parseSelectedMarbles(selectedMarblesStr);
-        if (selectedMarbles.isEmpty()) return;
-        
-        android.util.Log.d("GalleryFragment", "Executing opponent move from " + 
-            game.getCurrentPlayer() + " to " + target);
-        
-        // Select the marbles and make the move
-        game.clearSelection();
-        for (Hex marble : selectedMarbles) {
-            game.selectMarble(marble);
+        if (target == null) {
+            android.util.Log.e("GalleryFragment", "executeOpponentMove - Invalid target: " + targetStr);
+            return;
         }
         
-        // Execute the move using the existing makeMove method
-        if (game.makeMove(target)) {
-            // Animate the move
-            binding.hexagonalBoard.animateMove(selectedMarbles, target);
+        android.util.Log.d("GalleryFragment", "executeOpponentMove - Target position: " + target);
+        android.util.Log.d("GalleryFragment", "executeOpponentMove - Current player before move: " + game.getCurrentPlayer());
+        
+        // Parse selected marbles if available
+        List<Hex> selectedMarbles = new ArrayList<>();
+        if (moveData.has("selectedMarbles")) {
+            try {
+                Object selectedMarblesObj = moveData.get("selectedMarbles");
+                if (selectedMarblesObj instanceof JSONArray) {
+                    JSONArray marblesArray = (JSONArray) selectedMarblesObj;
+                    for (int i = 0; i < marblesArray.length(); i++) {
+                        Hex marble = Hex.fromString(marblesArray.getString(i));
+                        if (marble != null) {
+                            selectedMarbles.add(marble);
+                        }
+                    }
+                } else {
+                    // Fallback: parse as string
+                    selectedMarbles = parseSelectedMarbles(selectedMarblesObj.toString());
+                }
+            } catch (Exception e) {
+                android.util.Log.w("GalleryFragment", "executeOpponentMove - Failed to parse selectedMarbles", e);
+            }
+        }
+        
+        Player opponentColor = (myPlayerColor == Player.WHITE) ? Player.BLACK : Player.WHITE;
+        android.util.Log.d("GalleryFragment", "executeOpponentMove - Opponent color: " + opponentColor);
+        android.util.Log.d("GalleryFragment", "executeOpponentMove - Selected marbles count: " + selectedMarbles.size());
+        
+        boolean moveMade = false;
+        
+        // If we have the selected marbles info, use it for precise move execution
+        if (!selectedMarbles.isEmpty()) {
+            android.util.Log.d("GalleryFragment", "executeOpponentMove - Using precise marble selection");
             
-            android.util.Log.d("GalleryFragment", "Opponent move executed. Current player now: " + 
-                game.getCurrentPlayer());
+            // Clear and select the exact marbles
+            game.clearSelection();
+            for (Hex marble : selectedMarbles) {
+                android.util.Log.d("GalleryFragment", "executeOpponentMove - Selecting marble: " + marble);
+                game.selectMarble(marble);
+            }
             
-            Toast.makeText(getContext(), "Opponent moved. Your turn!", Toast.LENGTH_SHORT).show();
+            // Verify selection matches
+            List<Hex> currentSelection = game.getSelectedMarbles();
+            android.util.Log.d("GalleryFragment", "executeOpponentMove - Current selection: " + currentSelection.size() + " marbles");
+            
+            if (game.getValidMoves().contains(target)) {
+                android.util.Log.d("GalleryFragment", "executeOpponentMove - Target is valid, executing move");
+                if (game.makeMove(target)) {
+                    android.util.Log.d("GalleryFragment", "executeOpponentMove - Multi-marble move executed successfully!");
+                    moveMade = true;
+                }
+            } else {
+                android.util.Log.w("GalleryFragment", "executeOpponentMove - Target not valid for selected marbles");
+            }
+        }
+        
+        // Fallback: find any valid marble that can move to target (for backward compatibility)
+        if (!moveMade) {
+            android.util.Log.d("GalleryFragment", "executeOpponentMove - Using fallback single marble detection");
+            
+            for (Hex marblePos : game.getAllPositions()) {
+                Player marbleColor = game.getPlayerAt(marblePos);
+                
+                if (marbleColor == opponentColor) {
+                    game.clearSelection();
+                    game.selectMarble(marblePos);
+                    
+                    if (game.getValidMoves().contains(target)) {
+                        android.util.Log.d("GalleryFragment", "executeOpponentMove - Found valid move from " + marblePos + " to " + target);
+                        
+                        if (game.makeMove(target)) {
+                            android.util.Log.d("GalleryFragment", "executeOpponentMove - Single marble move executed successfully!");
+                            moveMade = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!moveMade) {
+            android.util.Log.e("GalleryFragment", "executeOpponentMove - FAILED to execute move!");
         } else {
-            Toast.makeText(getContext(), "Invalid opponent move", Toast.LENGTH_SHORT).show();
+            // Force UI update
+            binding.hexagonalBoard.invalidate();
+            updateUI();
         }
+        
+        android.util.Log.d("GalleryFragment", "executeOpponentMove - Current player after move: " + game.getCurrentPlayer());
+        
+        Toast.makeText(getContext(), "Opponent moved. Your turn!", Toast.LENGTH_SHORT).show();
+        
+        android.util.Log.d("GalleryFragment", "executeOpponentMove - END");
     }
     
     private List<Hex> parseSelectedMarbles(String selectedMarblesStr) {
