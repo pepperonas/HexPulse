@@ -433,9 +433,6 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     private void executeOpponentMove(JSONObject moveData) throws JSONException {
         android.util.Log.d("GalleryFragment", "executeOpponentMove - START");
         
-        // BIG FAT TOAST TO SEE IF THIS IS CALLED
-        Toast.makeText(getContext(), "🔥 OPPONENT MOVE RECEIVED! 🔥", Toast.LENGTH_LONG).show();
-        
         android.util.Log.d("GalleryFragment", "executeOpponentMove - moveData: " + moveData);
         
         // Parse the move and execute it on our local game
