@@ -28,6 +28,9 @@ import io.celox.hexpulse.game.Theme;
 import io.celox.hexpulse.network.GameClient;
 import io.celox.hexpulse.settings.GameSettings;
 import io.celox.hexpulse.ui.views.HexagonalBoardView;
+import io.celox.hexpulse.debug.DebugLogger;
+
+import android.widget.PopupMenu;
 
 public class GalleryFragment extends Fragment implements HexagonalBoardView.BoardTouchListener, GameClient.GameEventListener {
 
@@ -46,6 +49,9 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     private boolean isHost;
     private Player myPlayerColor;
     private boolean isOnlineGame = false;
+    
+    // Debug functionality
+    private DebugLogger debugLogger;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -116,6 +122,9 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     private void initializeGame() {
         game = new AbaloneGame();
         
+        // Initialize debug logger
+        debugLogger = new DebugLogger(getContext());
+        
         // Get settings
         GameSettings settings = GameSettings.getInstance(requireContext());
         
@@ -139,7 +148,17 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     private void setupUI() {
         // Set up button listeners
         binding.btnResetGame.setOnClickListener(v -> resetGame());
+        binding.btnUndo.setOnClickListener(v -> undoLastMove());
+        binding.btnUndo.setOnLongClickListener(v -> {
+            showUndoMenu(v);
+            return true;
+        });
         binding.btnClearSelection.setOnClickListener(v -> clearSelection());
+        binding.btnLogCriticalMove.setOnClickListener(v -> logCriticalMove());
+        
+        // Update button states
+        updateUndoButton();
+        updateDebugButton();
     }
 
     private void updateUI() {
@@ -150,6 +169,12 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
             game.getCurrentPlayer() == Player.BLACK ? 
             getString(R.string.black_player) : getString(R.string.white_player));
         binding.textCurrentPlayer.setText(currentPlayerText);
+
+        // Update undo button state
+        updateUndoButton();
+        
+        // Update debug button state
+        updateDebugButton();
 
         // Update scores
         Map<Player, Integer> scores = game.getScores();
@@ -240,13 +265,24 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
 
         Player playerAtPosition = game.getPlayerAt(position);
 
+        // DEBUG LOGGING FOR SUMITO CLICK
+        android.util.Log.d("GalleryFragment", "=== HEX TOUCHED DEBUG ===");
+        android.util.Log.d("GalleryFragment", "Clicked position: " + position);
+        android.util.Log.d("GalleryFragment", "Player at position: " + playerAtPosition);
+        android.util.Log.d("GalleryFragment", "Current player: " + game.getCurrentPlayer());
+        android.util.Log.d("GalleryFragment", "Selected marbles: " + game.getSelectedMarbles());
+        android.util.Log.d("GalleryFragment", "Valid moves: " + game.getValidMoves());
+        android.util.Log.d("GalleryFragment", "Is valid move: " + game.getValidMoves().contains(position));
+
         // If clicking on current player's marble, select/deselect it
         if (playerAtPosition == game.getCurrentPlayer()) {
+            android.util.Log.d("GalleryFragment", "CASE 1: Selecting/deselecting own marble");
             game.selectMarble(position);
             updateUI();
         }
         // If clicking on valid move position, make the move with animation
         else if (game.getValidMoves().contains(position)) {
+            android.util.Log.d("GalleryFragment", "CASE 2: Executing valid move");
             List<Hex> selectedMarbles = game.getSelectedMarbles();
             if (!selectedMarbles.isEmpty()) {
                 // Store target and selected marbles for later execution
@@ -255,12 +291,16 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
                 // Start animation
                 binding.hexagonalBoard.animateMove(selectedMarbles, position);
                 // Move will be executed when animation completes
+            } else {
+                android.util.Log.w("GalleryFragment", "No marbles selected for valid move!");
             }
         }
         // If clicking elsewhere, clear selection
         else {
+            android.util.Log.d("GalleryFragment", "CASE 3: Clearing selection");
             clearSelection();
         }
+        android.util.Log.d("GalleryFragment", "=== END HEX TOUCHED DEBUG ===");
     }
     
     @Override
@@ -340,6 +380,29 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         if (game != null) {
             game.resetGame();
             updateUI();
+            updateUndoButton();
+            updateDebugButton();
+        }
+    }
+
+    private void undoLastMove() {
+        if (game != null && game.canUndo()) {
+            // Don't allow undo during AI thinking or animations
+            if (isAiThinking || binding.hexagonalBoard.isAnimating()) {
+                return;
+            }
+            
+            // Don't allow undo in online games
+            if (isOnlineGame) {
+                Toast.makeText(getContext(), "Undo not available in online games", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            if (game.undoLastMove()) {
+                updateUI();
+                updateUndoButton();
+                Toast.makeText(getContext(), "Move undone", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -347,6 +410,117 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         if (game != null) {
             game.clearSelection();
             updateUI();
+        }
+    }
+    
+    private void updateUndoButton() {
+        if (game != null && binding != null) {
+            boolean canUndo = game.canUndo() && !isOnlineGame && !isAiThinking;
+            binding.btnUndo.setEnabled(canUndo);
+            
+            // Update button text to show undo count
+            if (canUndo) {
+                int undoCount = game.getUndoCount();
+                binding.btnUndo.setText(getString(R.string.undo_move) + " (" + undoCount + ")");
+            } else {
+                binding.btnUndo.setText(getString(R.string.undo_move));
+            }
+        }
+    }
+    
+    private void showUndoMenu(View anchor) {
+        if (game == null || !game.canUndo()) {
+            return;
+        }
+        
+        int undoCount = game.getUndoCount();
+        if (undoCount <= 1) {
+            // Only one move to undo, just do it directly
+            undoLastMove();
+            return;
+        }
+        
+        PopupMenu popup = new PopupMenu(getContext(), anchor);
+        
+        // Add undo options
+        popup.getMenu().add(0, 1, 0, "Undo 1 move");
+        
+        if (undoCount >= 2) {
+            popup.getMenu().add(0, 2, 0, "Undo 2 moves");
+        }
+        if (undoCount >= 3) {
+            popup.getMenu().add(0, 3, 0, "Undo 3 moves");
+        }
+        if (undoCount >= 5) {
+            popup.getMenu().add(0, 5, 0, "Undo 5 moves");
+        }
+        if (undoCount >= 2) {
+            popup.getMenu().add(0, undoCount, 0, "Undo all (" + undoCount + " moves)");
+        }
+        
+        popup.setOnMenuItemClickListener(item -> {
+            int movesToUndo = item.getItemId();
+            if (movesToUndo == undoCount) {
+                // Undo all moves
+                undoMoves(undoCount);
+            } else {
+                // Undo specific number of moves
+                undoMoves(movesToUndo);
+            }
+            return true;
+        });
+        
+        popup.show();
+    }
+    
+    /**
+     * Undo multiple moves
+     */
+    private void undoMoves(int count) {
+        if (game != null && game.undoMoves(count)) {
+            updateUI();
+            updateUndoButton();
+            Toast.makeText(getContext(), "Undone " + count + " moves", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(getContext(), "Failed to undo " + count + " moves", Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void updateDebugButton() {
+        if (game != null && binding != null) {
+            boolean hasDebugInfo = game.hasDebugInfo() && !isAiThinking;
+            binding.btnLogCriticalMove.setEnabled(hasDebugInfo);
+        }
+    }
+    
+    private void logCriticalMove() {
+        if (game != null && game.hasDebugInfo() && debugLogger != null) {
+            try {
+                io.celox.hexpulse.game.DebugMoveInfo debugInfo = game.getLastMoveDebugInfo();
+                if (debugInfo != null) {
+                    debugLogger.logCriticalMove(
+                        debugInfo.getBeforeState(),
+                        debugInfo.getAfterState(),
+                        debugInfo.getSelectedMarbles(),
+                        debugInfo.getTargetPosition(),
+                        debugInfo.getCurrentPlayer(),
+                        "Critical move logged by user"
+                    );
+                    
+                    String logPath = debugLogger.getLogDirectoryPath();
+                    Toast.makeText(getContext(), 
+                        "Critical move logged!\nPath: " + logPath, 
+                        Toast.LENGTH_LONG).show();
+                    
+                    // Clear debug info after logging
+                    game.clearDebugInfo();
+                    updateDebugButton();
+                } else {
+                    Toast.makeText(getContext(), "No debug information available", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(getContext(), "Failed to log critical move: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
         }
     }
 

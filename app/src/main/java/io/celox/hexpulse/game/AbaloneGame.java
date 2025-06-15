@@ -2,6 +2,8 @@ package io.celox.hexpulse.game;
 
 import java.util.*;
 
+import java.util.Stack;
+
 /**
  * Core game logic for Abalone
  */
@@ -12,12 +14,29 @@ public class AbaloneGame {
     private List<Hex> selectedMarbles;
     private Set<Hex> validMoves;
     private static final int WINNING_SCORE = 6;
+    private static final int MAX_UNDO_HISTORY = 10; // Maximum number of moves to keep for undo
+    
+    // Multi-Undo system
+    private Stack<GameSnapshot> undoHistory;
+    private int currentMoveNumber;
+    
+    // Debug functionality
+    private Map<Hex, Player> preMoveBoardState;
+    private List<Hex> debugSelectedMarbles;
+    private Hex debugTargetPosition;
+    private Player debugCurrentPlayer;
     
     public AbaloneGame() {
         board = new HashMap<>();
         scores = new HashMap<>();
         selectedMarbles = new ArrayList<>();
         validMoves = new HashSet<>();
+        undoHistory = new Stack<>();
+        currentMoveNumber = 0;
+        preMoveBoardState = null;
+        debugSelectedMarbles = new ArrayList<>();
+        debugTargetPosition = null;
+        debugCurrentPlayer = null;
         initializeGame();
     }
     
@@ -120,6 +139,7 @@ public class AbaloneGame {
     
     /**
      * Select or deselect a marble
+     * FIXED: Enforce maximum 3 marbles and they must be in a straight line
      */
     public boolean selectMarble(Hex position) {
         if (!isValidPosition(position)) {
@@ -131,8 +151,23 @@ public class AbaloneGame {
         // Can only select current player's marbles
         if (marble == currentPlayer) {
             if (selectedMarbles.contains(position)) {
+                // Deselect marble
                 selectedMarbles.remove(position);
             } else {
+                // Try to select marble
+                List<Hex> tempSelection = new ArrayList<>(selectedMarbles);
+                tempSelection.add(position);
+                
+                // Check maximum of 3 marbles
+                if (tempSelection.size() > 3) {
+                    return false; // Cannot select more than 3 marbles
+                }
+                
+                // Check if all selected marbles form a straight line
+                if (tempSelection.size() > 1 && !areMarblesStraightLine(tempSelection)) {
+                    return false; // Selected marbles must form a straight line
+                }
+                
                 selectedMarbles.add(position);
             }
             updateValidMoves();
@@ -141,6 +176,21 @@ public class AbaloneGame {
         
         return false;
     }
+    
+    /**
+     * Check if marbles form a straight line (helper method for selection validation)
+     */
+    private boolean areMarblesStraightLine(List<Hex> marbles) {
+        if (marbles.size() <= 1) {
+            return true;
+        }
+        
+        // Use new MoveValidator to check if marbles form a valid column
+        MoveValidator validator = new MoveValidator(board, currentPlayer);
+        List<MoveValidator.ValidatedMove> moves = validator.getValidMoves(marbles);
+        return !moves.isEmpty(); // If there are valid moves, marbles form a line
+    }
+    
     
     /**
      * Clear selection
@@ -162,20 +212,35 @@ public class AbaloneGame {
             return false;
         }
         
-        // Find movement direction
-        Integer direction = findMoveDirection(targetPosition);
-        if (direction == null) {
+        // Save current state before making the move
+        saveGameState();
+        
+        // Save debug information before move
+        saveDebugPreMoveState(targetPosition);
+        
+        // Find and execute the validated move using new logic
+        MoveValidator validator = new MoveValidator(board, currentPlayer);
+        List<MoveValidator.ValidatedMove> validatedMoves = validator.getValidMoves(selectedMarbles);
+        
+        // Find the move that matches the target position
+        MoveValidator.ValidatedMove selectedMove = null;
+        for (MoveValidator.ValidatedMove move : validatedMoves) {
+            if (move.targetPosition.equals(targetPosition)) {
+                selectedMove = move;
+                break;
+            }
+        }
+        
+        if (selectedMove == null) {
             return false;
         }
         
-        // Execute the move
-        if (isInlineMove(direction)) {
-            executeInlineMove(direction);
-        } else {
-            executeBroadsideMove(direction);
-        }
+        // Execute the validated move
+        MoveExecutor executor = new MoveExecutor(board, scores);
+        executor.executeMove(selectedMove, currentPlayer);
         
-        // Switch players and clear selection
+        // Increment move number and switch players
+        currentMoveNumber++;
         currentPlayer = currentPlayer.getOpponent();
         clearSelection();
         
@@ -183,7 +248,7 @@ public class AbaloneGame {
     }
     
     /**
-     * Update valid moves for current selection
+     * Update valid moves for current selection using new rule-compliant logic
      */
     private void updateValidMoves() {
         validMoves.clear();
@@ -192,91 +257,75 @@ public class AbaloneGame {
             return;
         }
         
-        // Check if all selected marbles belong to current player
-        for (Hex marble : selectedMarbles) {
-            if (board.get(marble) != currentPlayer) {
-                validMoves.clear();
-                return;
-            }
-        }
+        // Use new MoveValidator for rule-compliant validation
+        MoveValidator validator = new MoveValidator(board, currentPlayer);
+        List<MoveValidator.ValidatedMove> validatedMoves = validator.getValidMoves(selectedMarbles);
         
-        if (selectedMarbles.size() == 1) {
-            // Single marble - check all 6 directions
-            Hex marble = selectedMarbles.get(0);
-            for (int dir = 0; dir < 6; dir++) {
-                Hex target = marble.neighbor(dir);
-                if (isValidPosition(target) && board.get(target) == Player.EMPTY) {
-                    validMoves.add(target);
-                }
-            }
-        } else if (selectedMarbles.size() <= 3 && areMarblesInLine()) {
-            // Multiple marbles in line
-            for (int dir = 0; dir < 6; dir++) {
-                if (canMoveInDirection(dir)) {
-                    Hex target = getTargetForDirection(dir);
-                    if (target != null) {
-                        validMoves.add(target);
-                    }
-                }
-            }
+        // Convert ValidatedMoves to target positions for UI
+        for (MoveValidator.ValidatedMove move : validatedMoves) {
+            validMoves.add(move.targetPosition);
         }
     }
     
-    /**
-     * Check if selected marbles are in a line
-     */
-    private boolean areMarblesInLine() {
-        if (selectedMarbles.size() <= 1) {
-            return true;
-        }
-        
-        return getLineDirection() != null;
-    }
+    
     
     /**
-     * Get the direction of the line of marbles
+     * Check for winner
      */
-    private Integer getLineDirection() {
-        if (selectedMarbles.size() < 2) {
-            return null;
+    public Player checkWinner() {
+        if (scores.getOrDefault(Player.BLACK, 0) >= WINNING_SCORE) {
+            return Player.BLACK;
         }
-        
-        // Sort marbles for consistent processing
-        List<Hex> sortedMarbles = new ArrayList<>(selectedMarbles);
-        sortedMarbles.sort((a, b) -> {
-            if (a.q != b.q) return Integer.compare(a.q, b.q);
-            return Integer.compare(a.r, b.r);
-        });
-        
-        // Check all 6 directions
-        for (int dir = 0; dir < 6; dir++) {
-            if (checkLineInDirection(sortedMarbles, dir)) {
-                return dir;
-            }
+        if (scores.getOrDefault(Player.WHITE, 0) >= WINNING_SCORE) {
+            return Player.WHITE;
         }
-        
         return null;
     }
     
     /**
-     * Check if marbles form a line in given direction
+     * Save current game state to undo history
      */
-    private boolean checkLineInDirection(List<Hex> marbles, int direction) {
-        int[] dirVector = Hex.DIRECTIONS[direction];
+    private void saveGameState() {
+        GameSnapshot snapshot = new GameSnapshot(board, currentPlayer, scores, currentMoveNumber);
+        undoHistory.push(snapshot);
         
-        for (int i = 1; i < marbles.size(); i++) {
-            int expectedQ = marbles.get(0).q + dirVector[0] * i;
-            int expectedR = marbles.get(0).r + dirVector[1] * i;
-            
-            boolean found = false;
-            for (Hex marble : marbles) {
-                if (marble.q == expectedQ && marble.r == expectedR) {
-                    found = true;
-                    break;
-                }
-            }
-            
-            if (!found) {
+        // Limit undo history size
+        while (undoHistory.size() > MAX_UNDO_HISTORY) {
+            undoHistory.removeElementAt(0); // Remove oldest snapshot
+        }
+    }
+    
+    /**
+     * Undo the last move
+     */
+    public boolean undoLastMove() {
+        if (undoHistory.isEmpty()) {
+            return false; // No move to undo
+        }
+        
+        // Restore previous state
+        GameSnapshot snapshot = undoHistory.pop();
+        board = snapshot.getBoard();
+        currentPlayer = snapshot.getCurrentPlayer();
+        scores = snapshot.getScores();
+        currentMoveNumber = snapshot.getMoveNumber();
+        
+        // Clear selection and valid moves
+        clearSelection();
+        
+        return true;
+    }
+    
+    /**
+     * Undo multiple moves
+     */
+    public boolean undoMoves(int count) {
+        if (count <= 0 || count > undoHistory.size()) {
+            return false;
+        }
+        
+        for (int i = 0; i < count; i++) {
+            if (!undoLastMove()) {
                 return false;
             }
         }
@@ -285,274 +334,77 @@ public class AbaloneGame {
     }
     
     /**
-     * Check if movement in direction is possible
+     * Check if undo is available
      */
-    private boolean canMoveInDirection(int direction) {
-        if (selectedMarbles.size() == 1) {
-            Hex target = selectedMarbles.get(0).neighbor(direction);
-            return isValidPosition(target) && board.get(target) == Player.EMPTY;
-        }
-        
-        // For multiple marbles, check inline and broadside moves
-        return canMoveInline(direction) || canMoveBroadside(direction);
+    public boolean canUndo() {
+        return !undoHistory.isEmpty();
     }
     
     /**
-     * Check if inline move is possible
+     * Get number of moves that can be undone
      */
-    private boolean canMoveInline(int direction) {
-        Integer lineDir = getLineDirection();
-        if (lineDir == null) {
-            return false;
-        }
-        
-        // Inline move if direction is parallel to line
-        if (lineDir == direction || lineDir == (direction + 3) % 6) {
-            Hex leadMarble = getLeadMarble(direction);
-            Hex target = leadMarble.neighbor(direction);
-            
-            if (!isValidPosition(target)) {
-                return false;
-            }
-            
-            Player targetPlayer = board.get(target);
-            
-            // Empty target - simple move
-            if (targetPlayer == Player.EMPTY) {
-                return true;
-            }
-            
-            // Own marble - not allowed
-            if (targetPlayer == currentPlayer) {
-                return false;
-            }
-            
-            // Opponent marble - check if can push (Sumito)
-            return canPush(direction);
-        }
-        
-        return false;
+    public int getUndoCount() {
+        return undoHistory.size();
     }
     
     /**
-     * Check if broadside move is possible
+     * Get current move number
      */
-    private boolean canMoveBroadside(int direction) {
-        if (selectedMarbles.size() < 2) {
-            return false;
-        }
-        
-        Integer lineDir = getLineDirection();
-        if (lineDir == null) {
-            return false;
-        }
-        
-        // Broadside move if direction is perpendicular to line
-        if (lineDir != direction && lineDir != (direction + 3) % 6) {
-            // Check if all target positions are empty
-            for (Hex marble : selectedMarbles) {
-                Hex target = marble.neighbor(direction);
-                if (!isValidPosition(target) || board.get(target) != Player.EMPTY) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        
-        return false;
+    public int getCurrentMoveNumber() {
+        return currentMoveNumber;
     }
     
     /**
-     * Get the lead marble for inline movement
+     * Save debug information before making a move
      */
-    private Hex getLeadMarble(int direction) {
-        int[] dirVector = Hex.DIRECTIONS[direction];
-        
-        return selectedMarbles.stream()
-            .max((a, b) -> Integer.compare(
-                a.q * dirVector[0] + a.r * dirVector[1],
-                b.q * dirVector[0] + b.r * dirVector[1]
-            ))
-            .orElse(selectedMarbles.get(0));
+    private void saveDebugPreMoveState(Hex targetPosition) {
+        preMoveBoardState = new HashMap<>(board);
+        debugSelectedMarbles = new ArrayList<>(selectedMarbles);
+        debugTargetPosition = targetPosition;
+        debugCurrentPlayer = currentPlayer;
     }
     
     /**
-     * Check if can push opponent marbles (Sumito)
+     * Get debug information about the last move
      */
-    private boolean canPush(int direction) {
-        Hex leadMarble = getLeadMarble(direction);
-        Player opponent = currentPlayer.getOpponent();
-        
-        // Count opponent marbles in push direction
-        List<Hex> opponentMarbles = new ArrayList<>();
-        Hex current = leadMarble.neighbor(direction);
-        
-        while (isValidPosition(current) && board.get(current) == opponent) {
-            opponentMarbles.add(current);
-            current = current.neighbor(direction);
+    public DebugMoveInfo getLastMoveDebugInfo() {
+        if (preMoveBoardState == null) {
+            return null;
         }
         
-        // Need numerical superiority
-        if (selectedMarbles.size() <= opponentMarbles.size()) {
-            return false;
-        }
-        
-        // Check if space behind last opponent marble
-        if (!opponentMarbles.isEmpty()) {
-            Hex lastOpponent = opponentMarbles.get(opponentMarbles.size() - 1);
-            Hex behind = lastOpponent.neighbor(direction);
-            
-            // Can push off board or to empty space
-            return !isValidPosition(behind) || board.get(behind) == Player.EMPTY;
-        }
-        
-        return false;
+        return new DebugMoveInfo(
+            new HashMap<>(preMoveBoardState),
+            new HashMap<>(board),
+            new ArrayList<>(debugSelectedMarbles),
+            debugTargetPosition,
+            debugCurrentPlayer
+        );
     }
     
     /**
-     * Find movement direction to target
+     * Clear debug information
      */
-    private Integer findMoveDirection(Hex target) {
-        if (selectedMarbles.size() == 1) {
-            Hex marble = selectedMarbles.get(0);
-            for (int dir = 0; dir < 6; dir++) {
-                if (marble.neighbor(dir).equals(target)) {
-                    return dir;
-                }
-            }
-        } else {
-            for (int dir = 0; dir < 6; dir++) {
-                Hex expectedTarget = getTargetForDirection(dir);
-                if (target.equals(expectedTarget)) {
-                    return dir;
-                }
-            }
-        }
-        return null;
+    public void clearDebugInfo() {
+        preMoveBoardState = null;
+        debugSelectedMarbles.clear();
+        debugTargetPosition = null;
+        debugCurrentPlayer = null;
     }
     
     /**
-     * Get target position for direction
+     * Check if debug information is available
      */
-    private Hex getTargetForDirection(int direction) {
-        if (canMoveInline(direction)) {
-            Hex leadMarble = getLeadMarble(direction);
-            return leadMarble.neighbor(direction);
-        } else if (canMoveBroadside(direction)) {
-            return selectedMarbles.get(0).neighbor(direction);
-        }
-        return null;
-    }
-    
-    /**
-     * Check if this is an inline move
-     */
-    private boolean isInlineMove(int direction) {
-        if (selectedMarbles.size() == 1) {
-            return true;
-        }
-        
-        Integer lineDir = getLineDirection();
-        return lineDir != null && (lineDir == direction || lineDir == (direction + 3) % 6);
-    }
-    
-    /**
-     * Execute inline move
-     */
-    private void executeInlineMove(int direction) {
-        // Sort marbles in movement direction
-        int[] dirVector = Hex.DIRECTIONS[direction];
-        List<Hex> sortedMarbles = new ArrayList<>(selectedMarbles);
-        sortedMarbles.sort((a, b) -> Integer.compare(
-            b.q * dirVector[0] + b.r * dirVector[1],
-            a.q * dirVector[0] + a.r * dirVector[1]
-        ));
-        
-        Hex leadMarble = sortedMarbles.get(0);
-        Hex target = leadMarble.neighbor(direction);
-        
-        // Handle pushing if needed
-        if (isValidPosition(target) && board.get(target) != Player.EMPTY) {
-            pushOpponentMarbles(leadMarble, direction);
-        }
-        
-        // Move own marbles
-        List<Hex> oldPositions = new ArrayList<>(sortedMarbles);
-        for (Hex marble : oldPositions) {
-            board.put(marble, Player.EMPTY);
-        }
-        
-        for (Hex marble : oldPositions) {
-            Hex newPos = marble.neighbor(direction);
-            board.put(newPos, currentPlayer);
-        }
-    }
-    
-    /**
-     * Execute broadside move
-     */
-    private void executeBroadsideMove(int direction) {
-        List<Hex> oldPositions = new ArrayList<>(selectedMarbles);
-        
-        // Clear old positions
-        for (Hex marble : oldPositions) {
-            board.put(marble, Player.EMPTY);
-        }
-        
-        // Set new positions
-        for (Hex marble : oldPositions) {
-            Hex newPos = marble.neighbor(direction);
-            board.put(newPos, currentPlayer);
-        }
-    }
-    
-    /**
-     * Push opponent marbles
-     */
-    private void pushOpponentMarbles(Hex fromPosition, int direction) {
-        Player opponent = currentPlayer.getOpponent();
-        List<Hex> marblesToPush = new ArrayList<>();
-        
-        Hex current = fromPosition.neighbor(direction);
-        while (isValidPosition(current) && board.get(current) == opponent) {
-            marblesToPush.add(current);
-            current = current.neighbor(direction);
-        }
-        
-        // Push from back to front
-        Collections.reverse(marblesToPush);
-        for (Hex marble : marblesToPush) {
-            Hex newPos = marble.neighbor(direction);
-            
-            if (!isValidPosition(newPos)) {
-                // Marble pushed off board
-                board.put(marble, Player.EMPTY);
-                scores.put(currentPlayer, scores.get(currentPlayer) + 1);
-            } else {
-                // Move marble to new position
-                board.put(newPos, opponent);
-                board.put(marble, Player.EMPTY);
-            }
-        }
-    }
-    
-    /**
-     * Check for winner
-     */
-    public Player checkWinner() {
-        if (scores.get(Player.BLACK) >= WINNING_SCORE) {
-            return Player.BLACK;
-        }
-        if (scores.get(Player.WHITE) >= WINNING_SCORE) {
-            return Player.WHITE;
-        }
-        return null;
+    public boolean hasDebugInfo() {
+        return preMoveBoardState != null;
     }
     
     /**
      * Reset the game
      */
     public void resetGame() {
+        undoHistory.clear();
+        currentMoveNumber = 0;
+        clearDebugInfo();
         initializeGame();
     }
     
@@ -572,5 +424,11 @@ public class AbaloneGame {
         this.scores = new HashMap<>(other.scores);
         this.selectedMarbles = new ArrayList<>(other.selectedMarbles);
         this.validMoves = new HashSet<>(other.validMoves);
+        this.undoHistory = new Stack<>(); // Don't copy undo state for AI copies
+        this.currentMoveNumber = other.currentMoveNumber;
+        this.preMoveBoardState = null; // Don't copy debug state for AI copies
+        this.debugSelectedMarbles = new ArrayList<>();
+        this.debugTargetPosition = null;
+        this.debugCurrentPlayer = null;
     }
 }

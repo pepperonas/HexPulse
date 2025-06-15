@@ -283,6 +283,7 @@ public class HexagonalBoardView extends View {
         boolean isValidMove = game.getValidMoves().contains(position);
         boolean isHovered = position.equals(hoveredHex);
         
+        
         // Draw hexagon fill with gradient effect
         drawHexagonWithGradient(canvas, hexPath, x, y);
         
@@ -375,9 +376,34 @@ public class HexagonalBoardView extends View {
         float y = center[1];
         
         boolean isSelected = game.getSelectedMarbles().contains(position);
+        boolean isValidMoveTarget = game.getValidMoves().contains(position);
         
         // Use the enhanced marble drawing method
         drawMarbleAtPosition(canvas, x, y, player, isSelected);
+        
+        // Draw valid move highlight OVER the marble for push moves
+        if (isValidMoveTarget) {
+            // SUPER OBVIOUS GREEN HIGHLIGHT for debugging
+            Paint validMovePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            validMovePaint.setColor(Color.argb(255, 0, 255, 0)); // BRIGHT GREEN, fully opaque
+            validMovePaint.setStyle(Paint.Style.STROKE);
+            validMovePaint.setStrokeWidth(12f); // Very thick
+            canvas.drawCircle(x, y, MARBLE_RADIUS + 8, validMovePaint);
+            
+            // Additional outer ring 
+            Paint outerRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            outerRingPaint.setColor(Color.argb(255, 255, 255, 0)); // BRIGHT YELLOW
+            outerRingPaint.setStyle(Paint.Style.STROKE);
+            outerRingPaint.setStrokeWidth(8f);
+            canvas.drawCircle(x, y, MARBLE_RADIUS + 16, outerRingPaint);
+            
+            // Add text label for debugging
+            Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            textPaint.setColor(Color.RED);
+            textPaint.setTextSize(24f);
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText("VALID", x, y - MARBLE_RADIUS - 20, textPaint);
+        }
     }
     
     private void drawGameInfo(Canvas canvas) {
@@ -852,7 +878,26 @@ public class HexagonalBoardView extends View {
      * Handle selection of opponent marble - clear selection
      */
     private void handleOpponentMarbleSelection(Hex opponentPosition) {
-        game.clearSelection();
+        // CRITICAL FIX: Check if this opponent marble is a valid move target BEFORE clearing selection!
+        android.util.Log.d("HexagonalBoardView", "=== OPPONENT MARBLE CLICKED ===");
+        android.util.Log.d("HexagonalBoardView", "Opponent position: " + opponentPosition);
+        android.util.Log.d("HexagonalBoardView", "Current selection: " + game.getSelectedMarbles());
+        android.util.Log.d("HexagonalBoardView", "Valid moves: " + game.getValidMoves());
+        android.util.Log.d("HexagonalBoardView", "Is valid move: " + game.getValidMoves().contains(opponentPosition));
+        
+        // Check if clicking on this opponent marble is a valid move (Sumito!)
+        if (game.getValidMoves().contains(opponentPosition)) {
+            android.util.Log.d("HexagonalBoardView", "SUMITO MOVE DETECTED! Executing...");
+            
+            // Execute the move via TouchListener (same as empty space logic)
+            if (touchListener != null) {
+                touchListener.onHexTouched(opponentPosition);
+            }
+        } else {
+            android.util.Log.d("HexagonalBoardView", "Not a valid move, clearing selection");
+            game.clearSelection();
+        }
+        android.util.Log.d("HexagonalBoardView", "=== END OPPONENT MARBLE CLICKED ===");
     }
     
     /**

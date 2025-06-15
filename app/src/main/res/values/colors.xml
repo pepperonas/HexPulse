@@ -38,4 +38,5 @@
     <color name="red">#FFEF5350</color>
     <color name="green">#FF66BB6A</color>
     <color name="orange">#FFFFC107</color>
+    <color name="debug_button_color">#FFFF6D00</color>
 </resources>

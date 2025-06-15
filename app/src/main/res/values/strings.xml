@@ -33,7 +33,9 @@
     <string name="sound_on">Sound On</string>
     <string name="sound_off">Sound Off</string>
     <string name="reset_game">Reset</string>
+    <string name="undo_move">Undo</string>
     <string name="clear_selection">Clear</string>
+    <string name="log_critical_move">🐛 Log Critical Move</string>
     <string name="scores_display" formatted="false">Black: %d/6  White: %d/6</string>
     
     <!-- Online Game Strings -->
