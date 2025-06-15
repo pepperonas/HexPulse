@@ -561,18 +561,31 @@ public class HexagonalBoardView extends View {
         canvas.drawCircle(x - MARBLE_RADIUS * 0.35f, y - MARBLE_RADIUS * 0.35f, 
                          MARBLE_RADIUS * 0.25f, highlightPaint);
         
-        // Improved selection visualization
+        // Improved selection visualization with validity indication
         if (selected) {
-            // Primary selection ring
+            // Check if current selection is valid
+            boolean isSelectionValid = game != null && game.isCurrentSelectionValid();
+            
+            // Primary selection ring - color depends on validity
             Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            selectionPaint.setColor(Color.argb(200, 255, 193, 7));
+            if (isSelectionValid) {
+                // Valid selection - golden color
+                selectionPaint.setColor(Color.argb(200, 255, 193, 7));
+            } else {
+                // Invalid selection - red color  
+                selectionPaint.setColor(Color.argb(200, 255, 100, 100));
+            }
             selectionPaint.setStyle(Paint.Style.STROKE);
             selectionPaint.setStrokeWidth(SELECTION_RING_WIDTH);
             canvas.drawCircle(x, y, MARBLE_RADIUS + 6, selectionPaint);
             
-            // Secondary glow effect
+            // Secondary glow effect - same color as primary ring
             Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            glowPaint.setColor(Color.argb(100, 255, 193, 7));
+            if (isSelectionValid) {
+                glowPaint.setColor(Color.argb(100, 255, 193, 7));
+            } else {
+                glowPaint.setColor(Color.argb(100, 255, 100, 100));
+            }
             glowPaint.setStyle(Paint.Style.STROKE);
             glowPaint.setStrokeWidth(2f);
             canvas.drawCircle(x, y, MARBLE_RADIUS + 10, glowPaint);
@@ -590,12 +603,45 @@ public class HexagonalBoardView extends View {
         List<Hex> selectedMarbles = game.getSelectedMarbles();
         Set<Hex> validMoves = game.getValidMoves();
         
-        // For each valid move, determine which marbles would move and draw arrows
-        for (Hex target : validMoves) {
-            Integer direction = findMoveDirection(selectedMarbles, target);
-            if (direction != null) {
-                drawMovementArrows(canvas, selectedMarbles, direction);
+        // Simplified: Just draw arrows from each marble to each valid target
+        // This is more reliable than trying to guess exact directions
+        for (Hex marble : selectedMarbles) {
+            for (Hex target : validMoves) {
+                // Draw simple arrow from marble to target
+                drawSimpleArrow(canvas, marble, target);
             }
+        }
+    }
+    
+    /**
+     * Draw a simple arrow from one hex to another
+     */
+    private void drawSimpleArrow(Canvas canvas, Hex from, Hex to) {
+        float[] fromPos = from.toPixel(centerX, centerY, HEX_SIZE);
+        float[] toPos = to.toPixel(centerX, centerY, HEX_SIZE);
+        
+        // Make arrow less prominent and shorter
+        Paint arrowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        arrowPaint.setColor(Color.argb(120, 255, 193, 7)); // Semi-transparent golden
+        arrowPaint.setStyle(Paint.Style.STROKE);
+        arrowPaint.setStrokeWidth(3f);
+        arrowPaint.setPathEffect(new android.graphics.DashPathEffect(new float[]{8, 6}, 0));
+        
+        // Shorten the line to avoid overlapping with marbles
+        float dx = toPos[0] - fromPos[0];
+        float dy = toPos[1] - fromPos[1];
+        float length = (float) Math.sqrt(dx * dx + dy * dy);
+        
+        if (length > 40) { // Only draw if distance is reasonable
+            dx /= length;
+            dy /= length;
+            
+            float startX = fromPos[0] + dx * MARBLE_RADIUS;
+            float startY = fromPos[1] + dy * MARBLE_RADIUS;
+            float endX = toPos[0] - dx * MARBLE_RADIUS;
+            float endY = toPos[1] - dy * MARBLE_RADIUS;
+            
+            canvas.drawLine(startX, startY, endX, endY, arrowPaint);
         }
     }
     
@@ -836,25 +882,31 @@ public class HexagonalBoardView extends View {
     private void handleOwnMarbleSelection(Hex marblePosition) {
         List<Hex> currentSelection = game.getSelectedMarbles();
         
+        android.util.Log.d("HexagonalBoardView", "=== OWN MARBLE SELECTION DEBUG ===");
+        android.util.Log.d("HexagonalBoardView", "Clicked marble: " + marblePosition);
+        android.util.Log.d("HexagonalBoardView", "Current selection BEFORE: " + currentSelection);
+        android.util.Log.d("HexagonalBoardView", "Selection contains clicked marble: " + currentSelection.contains(marblePosition));
+        
         if (currentSelection.contains(marblePosition)) {
             // If marble is already selected, deselect it
-            game.clearSelection();
-            game.selectMarble(marblePosition);
-            
-            // If this was the only selected marble, clear all
-            if (currentSelection.size() == 1) {
-                game.clearSelection();
-            }
+            android.util.Log.d("HexagonalBoardView", "CASE: Deselecting already selected marble");
+            game.selectMarble(marblePosition); // This will toggle it off
         } else {
-            // Check if this marble can be added to current selection
-            if (canAddToSelection(marblePosition, currentSelection)) {
-                game.selectMarble(marblePosition);
-            } else {
-                // Start new selection with this marble
-                game.clearSelection();
-                game.selectMarble(marblePosition);
+            // Always try to add to selection - let AbaloneGame.selectMarble() handle validation
+            android.util.Log.d("HexagonalBoardView", "CASE: Trying to add new marble to selection");
+            boolean wasAdded = game.selectMarble(marblePosition);
+            android.util.Log.d("HexagonalBoardView", "Was marble added successfully: " + wasAdded);
+            
+            // If AbaloneGame rejected the marble (returned false), preserve current selection
+            if (!wasAdded) {
+                android.util.Log.d("HexagonalBoardView", "Marble rejected, preserving current selection");
+                // Do nothing - keep the current selection intact
             }
         }
+        
+        List<Hex> newSelection = game.getSelectedMarbles();
+        android.util.Log.d("HexagonalBoardView", "Current selection AFTER: " + newSelection);
+        android.util.Log.d("HexagonalBoardView", "=== END OWN MARBLE SELECTION DEBUG ===");
     }
     
     /**
@@ -901,29 +953,7 @@ public class HexagonalBoardView extends View {
     }
     
     /**
-     * Check if a marble can be added to the current selection (adjacency rules)
-     */
-    private boolean canAddToSelection(Hex newMarble, List<Hex> currentSelection) {
-        if (currentSelection.isEmpty()) {
-            return true;
-        }
-        
-        // Check if the new marble is adjacent to any selected marble
-        for (Hex selectedMarble : currentSelection) {
-            if (areAdjacent(newMarble, selectedMarble)) {
-                return true;
-            }
-        }
-        
-        // Check if all marbles (including new one) form a line
-        List<Hex> testSelection = new ArrayList<>(currentSelection);
-        testSelection.add(newMarble);
-        
-        return formsStraightLine(testSelection);
-    }
-    
-    /**
-     * Check if two hexes are adjacent
+     * Check if two hexes are adjacent (still needed for other logic)
      */
     private boolean areAdjacent(Hex hex1, Hex hex2) {
         for (int direction = 0; direction < 6; direction++) {
@@ -932,44 +962,6 @@ public class HexagonalBoardView extends View {
             }
         }
         return false;
-    }
-    
-    /**
-     * Check if selected marbles form a straight line (max 3 marbles)
-     */
-    private boolean formsStraightLine(List<Hex> marbles) {
-        if (marbles.size() <= 1) {
-            return true;
-        }
-        
-        if (marbles.size() > 3) {
-            return false; // Abalone rule: max 3 marbles
-        }
-        
-        if (marbles.size() == 2) {
-            return areAdjacent(marbles.get(0), marbles.get(1));
-        }
-        
-        // For 3 marbles, check if they form a straight line
-        Hex first = marbles.get(0);
-        Hex second = marbles.get(1);
-        Hex third = marbles.get(2);
-        
-        // Find direction from first to second
-        Integer direction = null;
-        for (int dir = 0; dir < 6; dir++) {
-            if (first.neighbor(dir).equals(second)) {
-                direction = dir;
-                break;
-            }
-        }
-        
-        if (direction == null) {
-            return false; // First two are not adjacent
-        }
-        
-        // Check if third marble is in the same direction
-        return second.neighbor(direction).equals(third) || first.neighbor((direction + 3) % 6).equals(third);
     }
     
     /**

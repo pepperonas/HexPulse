@@ -138,42 +138,67 @@ public class AbaloneGame {
     }
     
     /**
+     * Check if the current selection is valid (forms a straight line and has valid moves)
+     */
+    public boolean isCurrentSelectionValid() {
+        if (selectedMarbles.isEmpty()) {
+            return false;
+        }
+        if (selectedMarbles.size() == 1) {
+            return true; // Single marble is always valid
+        }
+        return areMarblesStraightLine(selectedMarbles);
+    }
+    
+    /**
      * Select or deselect a marble
-     * FIXED: Enforce maximum 3 marbles and they must be in a straight line
+     * UPDATED: Allow selection of any marbles (even invalid combinations), but only show valid moves for legal selections
      */
     public boolean selectMarble(Hex position) {
+        android.util.Log.d("AbaloneGame", "=== selectMarble DEBUG START ===");
+        android.util.Log.d("AbaloneGame", "selectMarble - position: " + position);
+        android.util.Log.d("AbaloneGame", "selectMarble - currentPlayer: " + currentPlayer);
+        android.util.Log.d("AbaloneGame", "selectMarble - selectedMarbles BEFORE: " + selectedMarbles);
+        android.util.Log.d("AbaloneGame", "selectMarble - selectedMarbles.size() BEFORE: " + selectedMarbles.size());
+        
         if (!isValidPosition(position)) {
+            android.util.Log.d("AbaloneGame", "selectMarble - REJECTED: Invalid position");
             return false;
         }
         
         Player marble = board.get(position);
+        android.util.Log.d("AbaloneGame", "selectMarble - marble at position: " + marble);
         
         // Can only select current player's marbles
         if (marble == currentPlayer) {
             if (selectedMarbles.contains(position)) {
                 // Deselect marble
+                android.util.Log.d("AbaloneGame", "selectMarble - DESELECTING marble at: " + position);
                 selectedMarbles.remove(position);
+                android.util.Log.d("AbaloneGame", "selectMarble - selectedMarbles AFTER deselection: " + selectedMarbles);
             } else {
-                // Try to select marble
-                List<Hex> tempSelection = new ArrayList<>(selectedMarbles);
-                tempSelection.add(position);
+                // Try to select marble - now allow any combination up to 3 marbles
+                android.util.Log.d("AbaloneGame", "selectMarble - ATTEMPTING to select marble at: " + position);
                 
                 // Check maximum of 3 marbles
-                if (tempSelection.size() > 3) {
+                if (selectedMarbles.size() >= 3) {
+                    android.util.Log.d("AbaloneGame", "selectMarble - REJECTED: Too many marbles (already have 3)");
                     return false; // Cannot select more than 3 marbles
                 }
                 
-                // Check if all selected marbles form a straight line
-                if (tempSelection.size() > 1 && !areMarblesStraightLine(tempSelection)) {
-                    return false; // Selected marbles must form a straight line
-                }
-                
+                android.util.Log.d("AbaloneGame", "selectMarble - ADDING marble to selection: " + position);
                 selectedMarbles.add(position);
+                android.util.Log.d("AbaloneGame", "selectMarble - selectedMarbles AFTER addition: " + selectedMarbles);
             }
             updateValidMoves();
+            android.util.Log.d("AbaloneGame", "selectMarble - validMoves updated, count: " + validMoves.size());
+            android.util.Log.d("AbaloneGame", "selectMarble - FINAL selectedMarbles: " + selectedMarbles);
+            android.util.Log.d("AbaloneGame", "=== selectMarble DEBUG END - SUCCESS ===");
             return true;
         }
         
+        android.util.Log.d("AbaloneGame", "selectMarble - REJECTED: Not current player's marble");
+        android.util.Log.d("AbaloneGame", "=== selectMarble DEBUG END - FAILURE ===");
         return false;
     }
     
@@ -181,14 +206,24 @@ public class AbaloneGame {
      * Check if marbles form a straight line (helper method for selection validation)
      */
     private boolean areMarblesStraightLine(List<Hex> marbles) {
+        android.util.Log.d("AbaloneGame", "=== areMarblesStraightLine DEBUG START ===");
+        android.util.Log.d("AbaloneGame", "areMarblesStraightLine - marbles: " + marbles);
+        android.util.Log.d("AbaloneGame", "areMarblesStraightLine - marbles.size(): " + marbles.size());
+        
         if (marbles.size() <= 1) {
+            android.util.Log.d("AbaloneGame", "areMarblesStraightLine - RESULT: true (size <= 1)");
             return true;
         }
         
         // Use new MoveValidator to check if marbles form a valid column
         MoveValidator validator = new MoveValidator(board, currentPlayer);
         List<MoveValidator.ValidatedMove> moves = validator.getValidMoves(marbles);
-        return !moves.isEmpty(); // If there are valid moves, marbles form a line
+        android.util.Log.d("AbaloneGame", "areMarblesStraightLine - validator found " + moves.size() + " valid moves");
+        
+        boolean result = !moves.isEmpty(); // If there are valid moves, marbles form a line
+        android.util.Log.d("AbaloneGame", "areMarblesStraightLine - RESULT: " + result);
+        android.util.Log.d("AbaloneGame", "=== areMarblesStraightLine DEBUG END ===");
+        return result;
     }
     
     
@@ -202,13 +237,22 @@ public class AbaloneGame {
     
     /**
      * Attempt to make a move
+     * UPDATED: Only allow moves if the current selection is valid
      */
     public boolean makeMove(Hex targetPosition) {
+        // First check if current selection is valid
+        if (!isCurrentSelectionValid()) {
+            android.util.Log.d("AbaloneGame", "makeMove - REJECTED: Current selection is invalid");
+            return false;
+        }
+        
         if (!validMoves.contains(targetPosition)) {
+            android.util.Log.d("AbaloneGame", "makeMove - REJECTED: Target not in valid moves");
             return false;
         }
         
         if (selectedMarbles.isEmpty()) {
+            android.util.Log.d("AbaloneGame", "makeMove - REJECTED: No marbles selected");
             return false;
         }
         
@@ -232,6 +276,7 @@ public class AbaloneGame {
         }
         
         if (selectedMove == null) {
+            android.util.Log.d("AbaloneGame", "makeMove - REJECTED: No matching validated move found");
             return false;
         }
         
@@ -244,17 +289,25 @@ public class AbaloneGame {
         currentPlayer = currentPlayer.getOpponent();
         clearSelection();
         
+        android.util.Log.d("AbaloneGame", "makeMove - SUCCESS: Move executed");
         return true;
     }
     
     /**
      * Update valid moves for current selection using new rule-compliant logic
+     * UPDATED: Only show valid moves if the selection itself is valid (forms a straight line)
      */
     private void updateValidMoves() {
         validMoves.clear();
         
         if (selectedMarbles.isEmpty()) {
             return;
+        }
+        
+        // Check if the current selection is valid (forms a straight line)
+        if (selectedMarbles.size() > 1 && !areMarblesStraightLine(selectedMarbles)) {
+            android.util.Log.d("AbaloneGame", "updateValidMoves - Selection is invalid (not straight line), no valid moves");
+            return; // Don't show any valid moves for invalid selections
         }
         
         // Use new MoveValidator for rule-compliant validation
@@ -265,6 +318,8 @@ public class AbaloneGame {
         for (MoveValidator.ValidatedMove move : validatedMoves) {
             validMoves.add(move.targetPosition);
         }
+        
+        android.util.Log.d("AbaloneGame", "updateValidMoves - Selection is valid, found " + validMoves.size() + " valid moves");
     }
     
     
