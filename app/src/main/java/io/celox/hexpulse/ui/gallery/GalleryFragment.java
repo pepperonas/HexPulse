@@ -26,6 +26,7 @@ import io.celox.hexpulse.game.Hex;
 import io.celox.hexpulse.game.Player;
 import io.celox.hexpulse.game.Theme;
 import io.celox.hexpulse.network.GameClient;
+import io.celox.hexpulse.settings.GameSettings;
 import io.celox.hexpulse.ui.views.HexagonalBoardView;
 
 public class GalleryFragment extends Fragment implements HexagonalBoardView.BoardTouchListener, GameClient.GameEventListener {
@@ -115,9 +116,13 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     private void initializeGame() {
         game = new AbaloneGame();
         
+        // Get settings
+        GameSettings settings = GameSettings.getInstance(requireContext());
+        
         // Setup AI if needed
         if ("AI".equals(gameMode)) {
-            ai = new AbaloneAI(AIDifficulty.MEDIUM); // Default to medium difficulty
+            AIDifficulty difficulty = settings.getAIDifficulty();
+            ai = new AbaloneAI(difficulty);
         } else {
             ai = null;
         }
@@ -125,7 +130,10 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         // Set up board
         binding.hexagonalBoard.setGame(game);
         binding.hexagonalBoard.setBoardTouchListener(this);
-        binding.hexagonalBoard.setTheme(Theme.CLASSIC); // Default theme
+        
+        // Apply theme from settings
+        Theme selectedTheme = settings.getTheme();
+        binding.hexagonalBoard.setTheme(selectedTheme);
     }
 
     private void setupUI() {
@@ -535,8 +543,6 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         
         android.util.Log.d("GalleryFragment", "executeOpponentMove - Current player after move: " + game.getCurrentPlayer());
         
-        Toast.makeText(getContext(), "Opponent moved. Your turn!", Toast.LENGTH_SHORT).show();
-        
         android.util.Log.d("GalleryFragment", "executeOpponentMove - END");
     }
     
@@ -604,6 +610,16 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         }
     }
 
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Update theme when returning from settings
+        if (binding != null && binding.hexagonalBoard != null) {
+            GameSettings settings = GameSettings.getInstance(requireContext());
+            binding.hexagonalBoard.setTheme(settings.getTheme());
+        }
+    }
 
     @Override
     public void onDestroyView() {

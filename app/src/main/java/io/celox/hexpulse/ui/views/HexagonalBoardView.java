@@ -15,10 +15,13 @@ import java.util.*;
  */
 public class HexagonalBoardView extends View {
     
-    // Drawing constants - Increased for better visibility
-    private static final float HEX_SIZE = 55f;  // Increased from 40f
-    private static final float MARBLE_RADIUS = 22f;  // Increased from 16f
-    private static final float BOARD_PADDING = 120f;
+    // Drawing constants - Optimized for larger board that fills screen
+    private static final float HEX_SIZE = 75f;  // Larger for better visibility
+    private static final float MARBLE_RADIUS = 30f;  // Proportional to hex size
+    private static final float BOARD_PADDING = 60f;  // Minimal padding for edge-to-edge
+    private static final float SELECTION_RING_WIDTH = 5f;
+    private static final float VALID_MOVE_RING_WIDTH = 4f;
+    private static final float TOUCH_TOLERANCE = MARBLE_RADIUS * 1.5f;
     
     // Paints for drawing
     private Paint hexPaint;
@@ -99,11 +102,11 @@ public class HexagonalBoardView extends View {
         
         hexSelectedPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         hexSelectedPaint.setStyle(Paint.Style.STROKE);
-        hexSelectedPaint.setStrokeWidth(4f);
+        hexSelectedPaint.setStrokeWidth(SELECTION_RING_WIDTH);
         
         hexValidMovePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         hexValidMovePaint.setStyle(Paint.Style.STROKE);
-        hexValidMovePaint.setStrokeWidth(4f);
+        hexValidMovePaint.setStrokeWidth(VALID_MOVE_RING_WIDTH);
         
         hexValidMoveFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         hexValidMoveFillPaint.setStyle(Paint.Style.FILL);
@@ -304,17 +307,23 @@ public class HexagonalBoardView extends View {
             validPaint.setStrokeWidth(5f);
             canvas.drawPath(hexPath, validPaint);
             
-            // Draw target indicator (circle in center)
+            // Enhanced target indicator with better visibility
             Paint targetPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            targetPaint.setColor(Color.argb(180, 255, 255, 255));
+            targetPaint.setColor(Color.argb(200, 255, 255, 255));
             targetPaint.setStyle(Paint.Style.FILL);
-            canvas.drawCircle(x, y, HEX_SIZE * 0.2f, targetPaint);
+            canvas.drawCircle(x, y, MARBLE_RADIUS * 0.6f, targetPaint);
             
-            // Draw target border
+            // Draw target border with improved styling
             targetPaint.setStyle(Paint.Style.STROKE);
-            targetPaint.setStrokeWidth(3f);
-            targetPaint.setColor(currentTheme.getHighlightColor());
-            canvas.drawCircle(x, y, HEX_SIZE * 0.2f, targetPaint);
+            targetPaint.setStrokeWidth(VALID_MOVE_RING_WIDTH);
+            targetPaint.setColor(Color.argb(220, 102, 187, 106));
+            canvas.drawCircle(x, y, MARBLE_RADIUS * 0.6f, targetPaint);
+            
+            // Add a small inner dot for precise targeting
+            Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            dotPaint.setColor(Color.argb(255, 76, 175, 80));
+            dotPaint.setStyle(Paint.Style.FILL);
+            canvas.drawCircle(x, y, MARBLE_RADIUS * 0.2f, dotPaint);
         }
         
         // Draw hover effect
@@ -367,52 +376,8 @@ public class HexagonalBoardView extends View {
         
         boolean isSelected = game.getSelectedMarbles().contains(position);
         
-        // Draw marble shadow
-        Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        shadowPaint.setColor(Color.argb(100, 0, 0, 0));
-        canvas.drawCircle(x + 2, y + 2, MARBLE_RADIUS, shadowPaint);
-        
-        // Choose marble color and create gradient
-        Paint marblePaint;
-        int lightColor, darkColor;
-        
-        if (player == Player.BLACK) {
-            lightColor = Color.rgb(60, 60, 70);
-            darkColor = Color.rgb(20, 20, 25);
-            marblePaint = blackMarblePaint;
-        } else {
-            lightColor = Color.rgb(255, 255, 255);
-            darkColor = Color.rgb(200, 200, 210);
-            marblePaint = whiteMarblePaint;
-        }
-        
-        // Create radial gradient for 3D marble effect
-        RadialGradient marbleGradient = new RadialGradient(
-            x - MARBLE_RADIUS * 0.4f, y - MARBLE_RADIUS * 0.4f, MARBLE_RADIUS,
-            lightColor, darkColor, Shader.TileMode.CLAMP
-        );
-        
-        Paint gradientMarblePaint = new Paint(marblePaint);
-        gradientMarblePaint.setShader(marbleGradient);
-        
-        // Draw marble
-        canvas.drawCircle(x, y, MARBLE_RADIUS, gradientMarblePaint);
-        
-        // Draw highlight on marble
-        Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        highlightPaint.setColor(Color.argb(180, 255, 255, 255));
-        canvas.drawCircle(x - MARBLE_RADIUS * 0.4f, y - MARBLE_RADIUS * 0.4f, 
-                         MARBLE_RADIUS * 0.3f, highlightPaint);
-        
-        // Draw selection glow
-        if (isSelected) {
-            Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            glowPaint.setColor(Color.argb(150, 255, 193, 7));
-            for (int i = 0; i < 5; i++) {
-                canvas.drawCircle(x, y, MARBLE_RADIUS + i * 2, glowPaint);
-                glowPaint.setAlpha(glowPaint.getAlpha() - 30);
-            }
-        }
+        // Use the enhanced marble drawing method
+        drawMarbleAtPosition(canvas, x, y, player, isSelected);
     }
     
     private void drawGameInfo(Canvas canvas) {
@@ -521,54 +486,70 @@ public class HexagonalBoardView extends View {
     }
     
     /**
-     * Draw a marble at specific pixel coordinates
+     * Draw a marble at specific pixel coordinates with enhanced visual quality
      */
     private void drawMarbleAtPosition(Canvas canvas, float x, float y, Player player, boolean selected) {
-        // Draw marble shadow
+        // Draw marble shadow with better precision
         Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        shadowPaint.setColor(Color.argb(100, 0, 0, 0));
-        canvas.drawCircle(x + 2, y + 2, MARBLE_RADIUS, shadowPaint);
+        shadowPaint.setColor(Color.argb(120, 0, 0, 0));
+        canvas.drawCircle(x + 3, y + 3, MARBLE_RADIUS + 1, shadowPaint);
         
-        // Choose marble color and create gradient
+        // Enhanced marble colors for better contrast
         Paint marblePaint;
-        int lightColor, darkColor;
+        int lightColor, darkColor, borderColor;
         
         if (player == Player.BLACK) {
-            lightColor = Color.rgb(60, 60, 70);
-            darkColor = Color.rgb(20, 20, 25);
+            lightColor = Color.rgb(80, 80, 90);
+            darkColor = Color.rgb(15, 15, 20);
+            borderColor = Color.rgb(60, 60, 70);
             marblePaint = blackMarblePaint;
         } else {
             lightColor = Color.rgb(255, 255, 255);
-            darkColor = Color.rgb(200, 200, 210);
+            darkColor = Color.rgb(180, 180, 190);
+            borderColor = Color.rgb(150, 150, 160);
             marblePaint = whiteMarblePaint;
         }
         
-        // Create radial gradient for 3D marble effect
+        // Create enhanced radial gradient for better 3D effect
         RadialGradient marbleGradient = new RadialGradient(
-            x - MARBLE_RADIUS * 0.4f, y - MARBLE_RADIUS * 0.4f, MARBLE_RADIUS,
+            x - MARBLE_RADIUS * 0.3f, y - MARBLE_RADIUS * 0.3f, MARBLE_RADIUS * 1.2f,
             lightColor, darkColor, Shader.TileMode.CLAMP
         );
         
         Paint gradientMarblePaint = new Paint(marblePaint);
         gradientMarblePaint.setShader(marbleGradient);
         
+        // Draw marble border for better definition
+        Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        borderPaint.setColor(borderColor);
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setStrokeWidth(2f);
+        canvas.drawCircle(x, y, MARBLE_RADIUS, borderPaint);
+        
         // Draw marble
-        canvas.drawCircle(x, y, MARBLE_RADIUS, gradientMarblePaint);
+        canvas.drawCircle(x, y, MARBLE_RADIUS - 1, gradientMarblePaint);
         
-        // Draw highlight on marble
+        // Enhanced highlight for better 3D effect
         Paint highlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        highlightPaint.setColor(Color.argb(180, 255, 255, 255));
-        canvas.drawCircle(x - MARBLE_RADIUS * 0.4f, y - MARBLE_RADIUS * 0.4f, 
-                         MARBLE_RADIUS * 0.3f, highlightPaint);
+        highlightPaint.setColor(Color.argb(200, 255, 255, 255));
+        canvas.drawCircle(x - MARBLE_RADIUS * 0.35f, y - MARBLE_RADIUS * 0.35f, 
+                         MARBLE_RADIUS * 0.25f, highlightPaint);
         
-        // Draw selection glow if selected
+        // Improved selection visualization
         if (selected) {
+            // Primary selection ring
+            Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            selectionPaint.setColor(Color.argb(200, 255, 193, 7));
+            selectionPaint.setStyle(Paint.Style.STROKE);
+            selectionPaint.setStrokeWidth(SELECTION_RING_WIDTH);
+            canvas.drawCircle(x, y, MARBLE_RADIUS + 6, selectionPaint);
+            
+            // Secondary glow effect
             Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            glowPaint.setColor(Color.argb(150, 255, 193, 7));
-            for (int i = 0; i < 5; i++) {
-                canvas.drawCircle(x, y, MARBLE_RADIUS + i * 2, glowPaint);
-                glowPaint.setAlpha(glowPaint.getAlpha() - 30);
-            }
+            glowPaint.setColor(Color.argb(100, 255, 193, 7));
+            glowPaint.setStyle(Paint.Style.STROKE);
+            glowPaint.setStrokeWidth(2f);
+            canvas.drawCircle(x, y, MARBLE_RADIUS + 10, glowPaint);
         }
     }
     
@@ -738,46 +719,264 @@ public class HexagonalBoardView extends View {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         // Block touch events during animation
-        if (isAnimating) {
+        if (isAnimating || game == null) {
             return true;
         }
         
-        if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            float touchX = event.getX();
-            float touchY = event.getY();
-            
-            Hex touchedHex = Hex.fromPixel(touchX, touchY, centerX, centerY, HEX_SIZE);
-            
-            // Check if the touched position is valid
-            if (game != null && game.isValidPosition(touchedHex)) {
-                hoveredHex = touchedHex;
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                return handleTouchDown(event.getX(), event.getY());
                 
-                if (touchListener != null) {
-                    touchListener.onHexTouched(touchedHex);
-                }
+            case MotionEvent.ACTION_MOVE:
+                return handleTouchMove(event.getX(), event.getY());
                 
-                performClick();
-                invalidate();
-                return true;
-            }
-        } else if (event.getAction() == MotionEvent.ACTION_MOVE) {
-            float touchX = event.getX();
-            float touchY = event.getY();
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                return handleTouchUp();
+                
+            default:
+                return super.onTouchEvent(event);
+        }
+    }
+    
+    /**
+     * Handle touch down - start marble selection process
+     */
+    private boolean handleTouchDown(float touchX, float touchY) {
+        Hex touchedHex = findHexAtPosition(touchX, touchY);
+        
+        if (touchedHex != null && game.isValidPosition(touchedHex)) {
+            hoveredHex = touchedHex;
             
-            Hex newHoveredHex = Hex.fromPixel(touchX, touchY, centerX, centerY, HEX_SIZE);
+            // Process the marble selection like in native Android apps
+            processMarbleSelection(touchedHex);
             
-            if (game != null && game.isValidPosition(newHoveredHex) && 
-                !newHoveredHex.equals(hoveredHex)) {
-                hoveredHex = newHoveredHex;
-                invalidate();
-            }
-        } else if (event.getAction() == MotionEvent.ACTION_UP || 
-                   event.getAction() == MotionEvent.ACTION_CANCEL) {
-            hoveredHex = null;
+            performClick();
             invalidate();
+            return true;
         }
         
-        return super.onTouchEvent(event);
+        return false;
+    }
+    
+    /**
+     * Handle touch move - update hover state
+     */
+    private boolean handleTouchMove(float touchX, float touchY) {
+        Hex newHoveredHex = findHexAtPosition(touchX, touchY);
+        
+        if (newHoveredHex != null && !newHoveredHex.equals(hoveredHex)) {
+            hoveredHex = newHoveredHex;
+            invalidate();
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Handle touch up - clear hover state
+     */
+    private boolean handleTouchUp() {
+        hoveredHex = null;
+        invalidate();
+        return true;
+    }
+    
+    /**
+     * Process marble selection with native Android app behavior
+     */
+    private void processMarbleSelection(Hex touchedHex) {
+        Player currentPlayer = game.getCurrentPlayer();
+        Player marbleAtPosition = game.getPlayerAt(touchedHex);
+        
+        // Case 1: Clicked on own marble - toggle selection
+        if (marbleAtPosition == currentPlayer) {
+            handleOwnMarbleSelection(touchedHex);
+        }
+        // Case 2: Clicked on empty space or valid move target
+        else if (marbleAtPosition == Player.EMPTY) {
+            handleEmptySpaceSelection(touchedHex);
+        }
+        // Case 3: Clicked on opponent marble - clear selection
+        else {
+            handleOpponentMarbleSelection(touchedHex);
+        }
+    }
+    
+    /**
+     * Handle selection of own marble - native Android behavior
+     */
+    private void handleOwnMarbleSelection(Hex marblePosition) {
+        List<Hex> currentSelection = game.getSelectedMarbles();
+        
+        if (currentSelection.contains(marblePosition)) {
+            // If marble is already selected, deselect it
+            game.clearSelection();
+            game.selectMarble(marblePosition);
+            
+            // If this was the only selected marble, clear all
+            if (currentSelection.size() == 1) {
+                game.clearSelection();
+            }
+        } else {
+            // Check if this marble can be added to current selection
+            if (canAddToSelection(marblePosition, currentSelection)) {
+                game.selectMarble(marblePosition);
+            } else {
+                // Start new selection with this marble
+                game.clearSelection();
+                game.selectMarble(marblePosition);
+            }
+        }
+    }
+    
+    /**
+     * Handle selection of empty space - try to make a move
+     */
+    private void handleEmptySpaceSelection(Hex emptyPosition) {
+        List<Hex> selectedMarbles = game.getSelectedMarbles();
+        
+        if (!selectedMarbles.isEmpty() && game.getValidMoves().contains(emptyPosition)) {
+            // Execute move - notify the touch listener
+            if (touchListener != null) {
+                touchListener.onHexTouched(emptyPosition);
+            }
+        } else {
+            // Clear selection if clicking on invalid move target
+            game.clearSelection();
+        }
+    }
+    
+    /**
+     * Handle selection of opponent marble - clear selection
+     */
+    private void handleOpponentMarbleSelection(Hex opponentPosition) {
+        game.clearSelection();
+    }
+    
+    /**
+     * Check if a marble can be added to the current selection (adjacency rules)
+     */
+    private boolean canAddToSelection(Hex newMarble, List<Hex> currentSelection) {
+        if (currentSelection.isEmpty()) {
+            return true;
+        }
+        
+        // Check if the new marble is adjacent to any selected marble
+        for (Hex selectedMarble : currentSelection) {
+            if (areAdjacent(newMarble, selectedMarble)) {
+                return true;
+            }
+        }
+        
+        // Check if all marbles (including new one) form a line
+        List<Hex> testSelection = new ArrayList<>(currentSelection);
+        testSelection.add(newMarble);
+        
+        return formsStraightLine(testSelection);
+    }
+    
+    /**
+     * Check if two hexes are adjacent
+     */
+    private boolean areAdjacent(Hex hex1, Hex hex2) {
+        for (int direction = 0; direction < 6; direction++) {
+            if (hex1.neighbor(direction).equals(hex2)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Check if selected marbles form a straight line (max 3 marbles)
+     */
+    private boolean formsStraightLine(List<Hex> marbles) {
+        if (marbles.size() <= 1) {
+            return true;
+        }
+        
+        if (marbles.size() > 3) {
+            return false; // Abalone rule: max 3 marbles
+        }
+        
+        if (marbles.size() == 2) {
+            return areAdjacent(marbles.get(0), marbles.get(1));
+        }
+        
+        // For 3 marbles, check if they form a straight line
+        Hex first = marbles.get(0);
+        Hex second = marbles.get(1);
+        Hex third = marbles.get(2);
+        
+        // Find direction from first to second
+        Integer direction = null;
+        for (int dir = 0; dir < 6; dir++) {
+            if (first.neighbor(dir).equals(second)) {
+                direction = dir;
+                break;
+            }
+        }
+        
+        if (direction == null) {
+            return false; // First two are not adjacent
+        }
+        
+        // Check if third marble is in the same direction
+        return second.neighbor(direction).equals(third) || first.neighbor((direction + 3) % 6).equals(third);
+    }
+    
+    /**
+     * Find hex at touch position with precise detection
+     */
+    private Hex findHexAtPosition(float touchX, float touchY) {
+        // Convert touch coordinates to hex using improved algorithm
+        Hex candidateHex = Hex.fromPixel(touchX, touchY, centerX, centerY, HEX_SIZE);
+        
+        if (game.isValidPosition(candidateHex)) {
+            float[] hexCenter = candidateHex.toPixel(centerX, centerY, HEX_SIZE);
+            float distance = (float) Math.sqrt(
+                Math.pow(touchX - hexCenter[0], 2) + Math.pow(touchY - hexCenter[1], 2)
+            );
+            
+            // Accept if within touch tolerance
+            if (distance <= TOUCH_TOLERANCE) {
+                return candidateHex;
+            }
+        }
+        
+        // Search nearby valid hexes if direct conversion failed
+        return findNearestValidHex(touchX, touchY);
+    }
+    
+    /**
+     * Find the nearest valid hex within touch tolerance
+     */
+    private Hex findNearestValidHex(float touchX, float touchY) {
+        float minDistance = Float.MAX_VALUE;
+        Hex nearestHex = null;
+        
+        // Check all valid board positions
+        for (int q = -4; q <= 4; q++) {
+            for (int r = Math.max(-4, -q - 4); r <= Math.min(4, -q + 4); r++) {
+                Hex hex = new Hex(q, r);
+                
+                if (game.isValidPosition(hex)) {
+                    float[] hexCenter = hex.toPixel(centerX, centerY, HEX_SIZE);
+                    float distance = (float) Math.sqrt(
+                        Math.pow(touchX - hexCenter[0], 2) + Math.pow(touchY - hexCenter[1], 2)
+                    );
+                    
+                    if (distance <= TOUCH_TOLERANCE && distance < minDistance) {
+                        minDistance = distance;
+                        nearestHex = hex;
+                    }
+                }
+            }
+        }
+        
+        return nearestHex;
     }
     
     @Override
@@ -786,11 +985,21 @@ public class HexagonalBoardView extends View {
     }
     
     /**
-     * Get optimal view size - increased for larger board
+     * Get optimal view size - fills available space with minimal padding
      */
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int size = (int) (HEX_SIZE * 24 + BOARD_PADDING * 2); // Increased from 20 to 24
-        setMeasuredDimension(size, size);
+        // Get the available space
+        int availableWidth = MeasureSpec.getSize(widthMeasureSpec);
+        int availableHeight = MeasureSpec.getSize(heightMeasureSpec);
+        
+        // Calculate optimal board size to fill most of the available space
+        int optimalSize = Math.min(availableWidth, availableHeight);
+        
+        // Ensure minimum size for playability
+        int minSize = (int) (HEX_SIZE * 24 + BOARD_PADDING * 2);
+        int finalSize = Math.max(optimalSize, minSize);
+        
+        setMeasuredDimension(finalSize, finalSize);
     }
 }
