@@ -381,9 +381,10 @@ public class HexagonalBoardView extends View {
         // Use the enhanced marble drawing method
         drawMarbleAtPosition(canvas, x, y, player, isSelected);
         
-        // Draw valid move highlight OVER the marble for push moves
-        if (isValidMoveTarget) {
-            // SUPER OBVIOUS GREEN HIGHLIGHT for debugging
+        // Draw valid move highlight ONLY for push moves to EMPTY spaces
+        // Do NOT highlight opponent marbles (but they can still be clicked for Sumito moves)
+        if (isValidMoveTarget && player == Player.EMPTY) {
+            // Green highlight only for empty target positions
             Paint validMovePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             validMovePaint.setColor(Color.argb(255, 0, 255, 0)); // BRIGHT GREEN, fully opaque
             validMovePaint.setStyle(Paint.Style.STROKE);
