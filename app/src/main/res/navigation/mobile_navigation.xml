@@ -28,4 +28,10 @@
         android:name="io.celox.hexpulse.ui.slideshow.SlideshowFragment"
         android:label="@string/menu_slideshow"
         tools:layout="@layout/fragment_slideshow" />
+
+    <fragment
+        android:id="@+id/nav_how_to_play"
+        android:name="io.celox.hexpulse.ui.howtoplay.HowToPlayFragment"
+        android:label="@string/how_to_play"
+        tools:layout="@layout/fragment_how_to_play" />
 </navigation>

@@ -60,6 +60,15 @@
             style="@style/AbaloneButton" />
 
         <Button
+            android:id="@+id/btn_how_to_play"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginBottom="16dp"
+            android:text="@string/how_to_play"
+            android:textSize="18sp"
+            style="@style/AbaloneButton" />
+
+        <Button
             android:id="@+id/btn_settings"
             android:layout_width="match_parent"
             android:layout_height="60dp"

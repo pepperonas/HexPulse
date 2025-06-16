@@ -11,6 +11,7 @@
     <string name="player_vs_player">Player vs Player</string>
     <string name="player_vs_ai">Player vs AI</string>
     <string name="settings">Settings</string>
+    <string name="how_to_play">How to Play</string>
     <string name="current_player">Current Player: %s</string>
     <string name="black_player">Black</string>
     <string name="white_player">White</string>

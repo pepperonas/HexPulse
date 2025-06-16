@@ -38,6 +38,10 @@ public class HomeFragment extends Fragment {
             Navigation.findNavController(v).navigate(R.id.nav_online_game);
         });
         
+        binding.btnHowToPlay.setOnClickListener(v -> {
+            Navigation.findNavController(v).navigate(R.id.nav_how_to_play);
+        });
+        
         binding.btnSettings.setOnClickListener(v -> {
             Navigation.findNavController(v).navigate(R.id.nav_slideshow);
         });
