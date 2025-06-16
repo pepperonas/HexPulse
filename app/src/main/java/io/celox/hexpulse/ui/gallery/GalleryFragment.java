@@ -23,6 +23,7 @@ import io.celox.hexpulse.game.AIDifficulty;
 import io.celox.hexpulse.game.AbaloneAI;
 import io.celox.hexpulse.game.AbaloneGame;
 import io.celox.hexpulse.game.Hex;
+import io.celox.hexpulse.game.MoveValidator;
 import io.celox.hexpulse.game.Player;
 import io.celox.hexpulse.game.Theme;
 import io.celox.hexpulse.network.GameClient;
@@ -224,7 +225,16 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
                             // Store target and selected marbles for animation
                             pendingMoveTarget = move.target;
                             pendingSelectedMarbles = new ArrayList<>(move.selectedMarbles);
-                            binding.hexagonalBoard.animateMove(move.selectedMarbles, move.target);
+                            
+                            // Get validated move information for AI push animation
+                            MoveValidator.ValidatedMove moveInfo = game.getValidatedMoveForTarget(move.target);
+                            if (moveInfo != null && moveInfo.isPush && !moveInfo.pushedMarbles.isEmpty()) {
+                                // Use animation with push for AI moves that push opponent marbles
+                                binding.hexagonalBoard.animateMoveWithPush(move.selectedMarbles, moveInfo.pushedMarbles, moveInfo.direction);
+                            } else {
+                                // Use regular animation for non-push AI moves
+                                binding.hexagonalBoard.animateMove(move.selectedMarbles, move.target);
+                            }
                         } else {
                             Toast.makeText(getContext(), "AI couldn't find a move", Toast.LENGTH_SHORT).show();
                         }
@@ -288,8 +298,16 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
                 // Store target and selected marbles for later execution
                 pendingMoveTarget = position;
                 pendingSelectedMarbles = new ArrayList<>(selectedMarbles); // Copy the list
-                // Start animation
-                binding.hexagonalBoard.animateMove(selectedMarbles, position);
+                
+                // Get validated move information for push animation
+                MoveValidator.ValidatedMove moveInfo = game.getValidatedMoveForTarget(position);
+                if (moveInfo != null && moveInfo.isPush && !moveInfo.pushedMarbles.isEmpty()) {
+                    // Use animation with push for moves that push opponent marbles
+                    binding.hexagonalBoard.animateMoveWithPush(selectedMarbles, moveInfo.pushedMarbles, moveInfo.direction);
+                } else {
+                    // Use regular animation for non-push moves
+                    binding.hexagonalBoard.animateMove(selectedMarbles, position);
+                }
                 // Move will be executed when animation completes
             } else {
                 android.util.Log.w("GalleryFragment", "No marbles selected for valid move!");
@@ -673,10 +691,24 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
             android.util.Log.d("GalleryFragment", "executeOpponentMove - Current selection: " + currentSelection.size() + " marbles");
             
             if (game.getValidMoves().contains(target)) {
-                android.util.Log.d("GalleryFragment", "executeOpponentMove - Target is valid, executing move");
-                if (game.makeMove(target)) {
-                    android.util.Log.d("GalleryFragment", "executeOpponentMove - Multi-marble move executed successfully!");
-                    moveMade = true;
+                android.util.Log.d("GalleryFragment", "executeOpponentMove - Target is valid, executing move with animation");
+                
+                // Get validated move information for opponent push animation
+                MoveValidator.ValidatedMove moveInfo = game.getValidatedMoveForTarget(target);
+                if (moveInfo != null && moveInfo.isPush && !moveInfo.pushedMarbles.isEmpty()) {
+                    // Store move data for execution after animation
+                    pendingMoveTarget = target;
+                    pendingSelectedMarbles = new ArrayList<>(selectedMarbles);
+                    // Use animation with push for opponent moves that push our marbles
+                    binding.hexagonalBoard.animateMoveWithPush(selectedMarbles, moveInfo.pushedMarbles, moveInfo.direction);
+                    moveMade = true; // Mark as handled (will be executed after animation)
+                } else {
+                    // Store move data for execution after animation
+                    pendingMoveTarget = target;
+                    pendingSelectedMarbles = new ArrayList<>(selectedMarbles);
+                    // Use regular animation for non-push opponent moves
+                    binding.hexagonalBoard.animateMove(selectedMarbles, target);
+                    moveMade = true; // Mark as handled (will be executed after animation)
                 }
             } else {
                 android.util.Log.w("GalleryFragment", "executeOpponentMove - Target not valid for selected marbles");
@@ -697,8 +729,25 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
                     if (game.getValidMoves().contains(target)) {
                         android.util.Log.d("GalleryFragment", "executeOpponentMove - Found valid move from " + marblePos + " to " + target);
                         
-                        if (game.makeMove(target)) {
-                            android.util.Log.d("GalleryFragment", "executeOpponentMove - Single marble move executed successfully!");
+                        // Get current selection for animation
+                        List<Hex> currentSelection = game.getSelectedMarbles();
+                        
+                        // Get validated move information for opponent push animation
+                        MoveValidator.ValidatedMove moveInfo = game.getValidatedMoveForTarget(target);
+                        if (moveInfo != null && moveInfo.isPush && !moveInfo.pushedMarbles.isEmpty()) {
+                            // Store move data for execution after animation
+                            pendingMoveTarget = target;
+                            pendingSelectedMarbles = new ArrayList<>(currentSelection);
+                            // Use animation with push for opponent moves that push our marbles
+                            binding.hexagonalBoard.animateMoveWithPush(currentSelection, moveInfo.pushedMarbles, moveInfo.direction);
+                            moveMade = true;
+                            break;
+                        } else {
+                            // Store move data for execution after animation
+                            pendingMoveTarget = target;
+                            pendingSelectedMarbles = new ArrayList<>(currentSelection);
+                            // Use regular animation for non-push opponent moves
+                            binding.hexagonalBoard.animateMove(currentSelection, target);
                             moveMade = true;
                             break;
                         }
@@ -709,13 +758,11 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         
         if (!moveMade) {
             android.util.Log.e("GalleryFragment", "executeOpponentMove - FAILED to execute move!");
-        } else {
-            // Force UI update
+            // Force UI update for failed moves (no animation)
             binding.hexagonalBoard.invalidate();
             updateUI();
         }
-        
-        android.util.Log.d("GalleryFragment", "executeOpponentMove - Current player after move: " + game.getCurrentPlayer());
+        // Note: For successful moves, UI will be updated after animation completes in onAnimationComplete()
         
         android.util.Log.d("GalleryFragment", "executeOpponentMove - END");
     }

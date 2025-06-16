@@ -294,6 +294,27 @@ public class AbaloneGame {
     }
     
     /**
+     * Get the validated move information for a target position
+     * This is used for animation purposes to get push information
+     */
+    public MoveValidator.ValidatedMove getValidatedMoveForTarget(Hex targetPosition) {
+        if (selectedMarbles.isEmpty() || !validMoves.contains(targetPosition)) {
+            return null;
+        }
+        
+        MoveValidator validator = new MoveValidator(board, currentPlayer);
+        List<MoveValidator.ValidatedMove> validatedMoves = validator.getValidMoves(selectedMarbles);
+        
+        for (MoveValidator.ValidatedMove move : validatedMoves) {
+            if (move.targetPosition.equals(targetPosition)) {
+                return move;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
      * Update valid moves for current selection using new rule-compliant logic
      * UPDATED: Only show valid moves if the selection itself is valid (forms a straight line)
      */

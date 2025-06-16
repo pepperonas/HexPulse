@@ -64,13 +64,20 @@ public class HexagonalBoardView extends View {
         public final Hex fromPosition;
         public final Hex toPosition;
         public final Player player;
+        public final boolean fallsOffBoard;
         public float currentX;
         public float currentY;
         
-        public AnimatedMarble(Hex from, Hex to, Player player) {
+        public AnimatedMarble(Hex from, Hex to, Player player, boolean fallsOffBoard) {
             this.fromPosition = from;
             this.toPosition = to;
             this.player = player;
+            this.fallsOffBoard = fallsOffBoard;
+        }
+        
+        // Backward compatibility constructor
+        public AnimatedMarble(Hex from, Hex to, Player player) {
+            this(from, to, player, false);
         }
     }
     
@@ -190,6 +197,56 @@ public class HexagonalBoardView extends View {
                 
                 animatedMarbles.add(animMarble);
             }
+        }
+        
+        // Start animation
+        isAnimating = true;
+        animationStartTime = System.currentTimeMillis();
+        invalidate();
+    }
+    
+    /**
+     * Animate move with pushed marbles included
+     */
+    public void animateMoveWithPush(List<Hex> selectedMarbles, List<Hex> pushedMarbles, int direction) {
+        if (isAnimating || game == null) {
+            return;
+        }
+        
+        // Setup animation data
+        animatedMarbles.clear();
+        
+        // Animate selected marbles (player's own marbles)
+        for (Hex marble : selectedMarbles) {
+            Hex newPos = marble.neighbor(direction);
+            if (game.isValidPosition(newPos)) {
+                Player player = game.getPlayerAt(marble);
+                AnimatedMarble animMarble = new AnimatedMarble(marble, newPos, player);
+                
+                // Set initial position
+                float[] fromPixel = marble.toPixel(centerX, centerY, HEX_SIZE);
+                animMarble.currentX = fromPixel[0];
+                animMarble.currentY = fromPixel[1];
+                
+                animatedMarbles.add(animMarble);
+            }
+        }
+        
+        // Animate pushed marbles (opponent marbles)
+        for (Hex pushedMarble : pushedMarbles) {
+            Hex newPos = pushedMarble.neighbor(direction);
+            Player player = game.getPlayerAt(pushedMarble);
+            boolean fallsOff = !game.isValidPosition(newPos);
+            
+            // Create animation for pushed marble
+            AnimatedMarble animMarble = new AnimatedMarble(pushedMarble, newPos, player, fallsOff);
+            
+            // Set initial position
+            float[] fromPixel = pushedMarble.toPixel(centerX, centerY, HEX_SIZE);
+            animMarble.currentX = fromPixel[0];
+            animMarble.currentY = fromPixel[1];
+            
+            animatedMarbles.add(animMarble);
         }
         
         // Start animation
@@ -450,7 +507,19 @@ public class HexagonalBoardView extends View {
         // Update positions of all animated marbles
         for (AnimatedMarble marble : animatedMarbles) {
             float[] fromPixel = marble.fromPosition.toPixel(centerX, centerY, HEX_SIZE);
-            float[] toPixel = marble.toPosition.toPixel(centerX, centerY, HEX_SIZE);
+            float[] toPixel;
+            
+            if (marble.fallsOffBoard) {
+                // For marbles falling off board, calculate a position beyond the edge
+                toPixel = marble.toPosition.toPixel(centerX, centerY, HEX_SIZE);
+                // Extend the animation beyond the target to make it fall off visually
+                float dx = toPixel[0] - fromPixel[0];
+                float dy = toPixel[1] - fromPixel[1];
+                toPixel[0] += dx * 0.5f; // Extend 50% further
+                toPixel[1] += dy * 0.5f;
+            } else {
+                toPixel = marble.toPosition.toPixel(centerX, centerY, HEX_SIZE);
+            }
             
             marble.currentX = fromPixel[0] + (toPixel[0] - fromPixel[0]) * progress;
             marble.currentY = fromPixel[1] + (toPixel[1] - fromPixel[1]) * progress;
@@ -507,8 +576,73 @@ public class HexagonalBoardView extends View {
      * Draw all currently animated marbles
      */
     private void drawAnimatedMarbles(Canvas canvas) {
+        long currentTime = System.currentTimeMillis();
+        long elapsed = currentTime - animationStartTime;
+        float progress = Math.min(1.0f, (float) elapsed / ANIMATION_DURATION);
+        
         for (AnimatedMarble marble : animatedMarbles) {
-            drawMarbleAtPosition(canvas, marble.currentX, marble.currentY, marble.player, false);
+            if (marble.fallsOffBoard) {
+                // Apply fade effect for marbles falling off board
+                float alpha = 1.0f - progress * 0.8f; // Fade to 20% opacity
+                drawMarbleAtPositionWithAlpha(canvas, marble.currentX, marble.currentY, marble.player, false, alpha);
+            } else {
+                drawMarbleAtPosition(canvas, marble.currentX, marble.currentY, marble.player, false);
+            }
+        }
+    }
+    
+    /**
+     * Draw a marble at specific pixel coordinates with alpha transparency
+     */
+    private void drawMarbleAtPositionWithAlpha(Canvas canvas, float x, float y, Player player, boolean selected, float alpha) {
+        // Draw marble shadow with transparency
+        Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        shadowPaint.setColor(Color.argb((int)(120 * alpha), 0, 0, 0));
+        canvas.drawCircle(x + 3, y + 3, MARBLE_RADIUS + 1, shadowPaint);
+        
+        // Enhanced marble colors for better contrast with alpha
+        Paint marblePaint;
+        int lightColor, darkColor, borderColor;
+        
+        if (player == Player.BLACK) {
+            lightColor = Color.argb((int)(255 * alpha), 80, 80, 90);
+            darkColor = Color.argb((int)(255 * alpha), 15, 15, 20);
+            borderColor = Color.argb((int)(255 * alpha), 60, 60, 70);
+            marblePaint = new Paint(blackMarblePaint);
+        } else {
+            lightColor = Color.argb((int)(255 * alpha), 255, 255, 255);
+            darkColor = Color.argb((int)(255 * alpha), 180, 180, 190);
+            borderColor = Color.argb((int)(255 * alpha), 150, 150, 160);
+            marblePaint = new Paint(whiteMarblePaint);
+        }
+        
+        // Create enhanced radial gradient for better 3D effect with alpha
+        RadialGradient marbleGradient = new RadialGradient(
+            x - MARBLE_RADIUS * 0.3f, y - MARBLE_RADIUS * 0.3f, MARBLE_RADIUS * 1.2f,
+            lightColor, darkColor, Shader.TileMode.CLAMP
+        );
+        
+        Paint gradientMarblePaint = new Paint(marblePaint);
+        gradientMarblePaint.setShader(marbleGradient);
+        gradientMarblePaint.setAlpha((int)(255 * alpha));
+        
+        // Draw marble border for better definition with alpha
+        Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        borderPaint.setColor(borderColor);
+        borderPaint.setStyle(Paint.Style.STROKE);
+        borderPaint.setStrokeWidth(2f);
+        canvas.drawCircle(x, y, MARBLE_RADIUS, borderPaint);
+        
+        // Draw marble
+        canvas.drawCircle(x, y, MARBLE_RADIUS - 1, gradientMarblePaint);
+        
+        // Draw selection ring if selected
+        if (selected) {
+            Paint selectionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            selectionPaint.setColor(Color.argb((int)(255 * alpha), 255, 255, 0));
+            selectionPaint.setStyle(Paint.Style.STROKE);
+            selectionPaint.setStrokeWidth(SELECTION_RING_WIDTH);
+            canvas.drawCircle(x, y, MARBLE_RADIUS + 8, selectionPaint);
         }
     }
     
