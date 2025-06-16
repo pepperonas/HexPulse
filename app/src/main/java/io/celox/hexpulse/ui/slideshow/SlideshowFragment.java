@@ -34,6 +34,7 @@ public class SlideshowFragment extends Fragment {
         setupAIDifficultySpinner();
         setupThemeSpinner();
         setupSoundSwitch();
+        setupDebugModeSwitch();
         setupResetButton();
 
         return root;
@@ -130,12 +131,26 @@ public class SlideshowFragment extends Fragment {
         });
     }
 
+    private void setupDebugModeSwitch() {
+        // Set current state
+        binding.switchDebugMode.setChecked(gameSettings.isDebugModeEnabled());
+
+        // Set up listener
+        binding.switchDebugMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            gameSettings.setDebugModeEnabled(isChecked);
+            Toast.makeText(getContext(), 
+                "Debug Mode " + (isChecked ? "enabled" : "disabled"), 
+                Toast.LENGTH_SHORT).show();
+        });
+    }
+
     private void setupResetButton() {
         binding.btnResetSettings.setOnClickListener(v -> {
             // Reset to defaults
             gameSettings.setAIDifficulty(AIDifficulty.MEDIUM);
             gameSettings.setTheme(Theme.CLASSIC);
             gameSettings.setSoundEnabled(true);
+            gameSettings.setDebugModeEnabled(false);
 
             // Update UI
             updateUIFromSettings();
@@ -159,6 +174,9 @@ public class SlideshowFragment extends Fragment {
 
         // Update Sound switch
         binding.switchSoundEnabled.setChecked(gameSettings.isSoundEnabled());
+
+        // Update Debug Mode switch
+        binding.switchDebugMode.setChecked(gameSettings.isDebugModeEnabled());
     }
 
     @Override

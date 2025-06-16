@@ -13,6 +13,7 @@ public class GameSettings {
     private static final String KEY_AI_DIFFICULTY = "ai_difficulty";
     private static final String KEY_THEME = "theme";
     private static final String KEY_SOUND_ENABLED = "sound_enabled";
+    private static final String KEY_DEBUG_MODE = "debug_mode";
     
     private static GameSettings instance;
     private SharedPreferences preferences;
@@ -63,6 +64,15 @@ public class GameSettings {
     
     public void setSoundEnabled(boolean enabled) {
         preferences.edit().putBoolean(KEY_SOUND_ENABLED, enabled).apply();
+    }
+    
+    // Debug Mode Settings
+    public boolean isDebugModeEnabled() {
+        return preferences.getBoolean(KEY_DEBUG_MODE, false); // Default disabled
+    }
+    
+    public void setDebugModeEnabled(boolean enabled) {
+        preferences.edit().putBoolean(KEY_DEBUG_MODE, enabled).apply();
     }
     
     // Utility method to get display name for difficulty

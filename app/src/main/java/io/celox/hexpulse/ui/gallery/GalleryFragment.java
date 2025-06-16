@@ -160,6 +160,7 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         // Update button states
         updateUndoButton();
         updateDebugButton();
+        updateDebugButtonsVisibility();
     }
 
     private void updateUI() {
@@ -511,6 +512,19 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         }
     }
     
+    private void updateDebugButtonsVisibility() {
+        if (binding != null) {
+            GameSettings settings = GameSettings.getInstance(requireContext());
+            boolean debugModeEnabled = settings.isDebugModeEnabled();
+            
+            // Show/hide Undo button based on debug mode
+            binding.btnUndo.setVisibility(debugModeEnabled ? View.VISIBLE : View.GONE);
+            
+            // Show/hide Log Critical Move button based on debug mode
+            binding.btnLogCriticalMove.setVisibility(debugModeEnabled ? View.VISIBLE : View.GONE);
+        }
+    }
+    
     private void logCriticalMove() {
         if (game != null && game.hasDebugInfo() && debugLogger != null) {
             try {
@@ -835,10 +849,11 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     @Override
     public void onResume() {
         super.onResume();
-        // Update theme when returning from settings
+        // Update theme and debug buttons visibility when returning from settings
         if (binding != null && binding.hexagonalBoard != null) {
             GameSettings settings = GameSettings.getInstance(requireContext());
             binding.hexagonalBoard.setTheme(settings.getTheme());
+            updateDebugButtonsVisibility();
         }
     }
 

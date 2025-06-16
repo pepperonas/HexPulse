@@ -51,7 +51,7 @@
     <string name="room_not_found">Room not found</string>
     <string name="connection_failed">Connection failed</string>
     <string name="share_room_link">Share Room Link</string>
-    <string name="room_link_format">Join my Abalone game: Room %s</string>
+    <string name="room_link_format">Join my HexPulse game: Room %s</string>
     <string name="copy_room_code">Copy Room Code</string>
     <string name="room_code_copied">Room code copied to clipboard</string>
     <string name="start_game">Start Game</string>
