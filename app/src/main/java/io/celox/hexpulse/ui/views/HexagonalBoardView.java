@@ -594,7 +594,7 @@ public class HexagonalBoardView extends View {
     }
     
     /**
-     * Draw movement preview arrows from selected marbles to valid targets
+     * Draw movement preview with yellow arrows from selected marbles to possible destinations
      */
     private void drawMovementPreview(Canvas canvas) {
         if (game == null || game.getSelectedMarbles().isEmpty() || game.getValidMoves().isEmpty()) {
@@ -604,46 +604,88 @@ public class HexagonalBoardView extends View {
         List<Hex> selectedMarbles = game.getSelectedMarbles();
         Set<Hex> validMoves = game.getValidMoves();
         
-        // Simplified: Just draw arrows from each marble to each valid target
-        // This is more reliable than trying to guess exact directions
+        // Draw yellow arrows from each selected marble to each valid move target
         for (Hex marble : selectedMarbles) {
             for (Hex target : validMoves) {
-                // Draw simple arrow from marble to target
-                drawSimpleArrow(canvas, marble, target);
+                // Check if this marble can actually move to this target
+                if (canMarbleReachTarget(marble, target, selectedMarbles)) {
+                    drawYellowArrow(canvas, marble, target);
+                }
             }
         }
     }
     
     /**
-     * Draw a simple arrow from one hex to another
+     * Check if a marble can move to a specific target based on game rules
      */
-    private void drawSimpleArrow(Canvas canvas, Hex from, Hex to) {
+    private boolean canMarbleReachTarget(Hex marble, Hex target, List<Hex> selectedMarbles) {
+        // For single marble, check if target is adjacent
+        if (selectedMarbles.size() == 1) {
+            for (int dir = 0; dir < 6; dir++) {
+                if (marble.neighbor(dir).equals(target)) {
+                    return true;
+                }
+            }
+        } else {
+            // For multiple marbles moving together, check if marble can reach target
+            // This is simplified - in reality we'd need to check the exact movement pattern
+            for (int dir = 0; dir < 6; dir++) {
+                Hex nextPos = marble.neighbor(dir);
+                if (nextPos.equals(target)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Draw yellow arrow from source to target position
+     */
+    private void drawYellowArrow(Canvas canvas, Hex from, Hex to) {
         float[] fromPos = from.toPixel(centerX, centerY, HEX_SIZE);
         float[] toPos = to.toPixel(centerX, centerY, HEX_SIZE);
         
-        // Make arrow less prominent and shorter
         Paint arrowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        arrowPaint.setColor(Color.argb(120, 255, 193, 7)); // Semi-transparent golden
+        arrowPaint.setColor(Color.argb(220, 255, 215, 0)); // Golden yellow
         arrowPaint.setStyle(Paint.Style.STROKE);
         arrowPaint.setStrokeWidth(3f);
-        arrowPaint.setPathEffect(new android.graphics.DashPathEffect(new float[]{8, 6}, 0));
+        arrowPaint.setStrokeCap(Paint.Cap.ROUND);
         
-        // Shorten the line to avoid overlapping with marbles
+        // Calculate direction
         float dx = toPos[0] - fromPos[0];
         float dy = toPos[1] - fromPos[1];
         float length = (float) Math.sqrt(dx * dx + dy * dy);
         
-        if (length > 40) { // Only draw if distance is reasonable
-            dx /= length;
-            dy /= length;
-            
-            float startX = fromPos[0] + dx * MARBLE_RADIUS;
-            float startY = fromPos[1] + dy * MARBLE_RADIUS;
-            float endX = toPos[0] - dx * MARBLE_RADIUS;
-            float endY = toPos[1] - dy * MARBLE_RADIUS;
-            
-            canvas.drawLine(startX, startY, endX, endY, arrowPaint);
-        }
+        if (length < 10) return; // Too short to draw
+        
+        dx /= length;
+        dy /= length;
+        
+        // Start arrow from edge of marble
+        float startX = fromPos[0] + dx * (MARBLE_RADIUS + 5);
+        float startY = fromPos[1] + dy * (MARBLE_RADIUS + 5);
+        
+        // End arrow before reaching target
+        float endX = toPos[0] - dx * (MARBLE_RADIUS + 5);
+        float endY = toPos[1] - dy * (MARBLE_RADIUS + 5);
+        
+        // Draw arrow line
+        canvas.drawLine(startX, startY, endX, endY, arrowPaint);
+        
+        // Draw arrowhead
+        float arrowHeadLength = 15f;
+        float arrowHeadAngle = (float) Math.PI / 6; // 30 degrees
+        
+        // Calculate arrowhead points
+        float arrowX1 = endX - arrowHeadLength * (float) Math.cos(Math.atan2(dy, dx) - arrowHeadAngle);
+        float arrowY1 = endY - arrowHeadLength * (float) Math.sin(Math.atan2(dy, dx) - arrowHeadAngle);
+        float arrowX2 = endX - arrowHeadLength * (float) Math.cos(Math.atan2(dy, dx) + arrowHeadAngle);
+        float arrowY2 = endY - arrowHeadLength * (float) Math.sin(Math.atan2(dy, dx) + arrowHeadAngle);
+        
+        // Draw arrowhead
+        canvas.drawLine(endX, endY, arrowX1, arrowY1, arrowPaint);
+        canvas.drawLine(endX, endY, arrowX2, arrowY2, arrowPaint);
     }
     
     /**
