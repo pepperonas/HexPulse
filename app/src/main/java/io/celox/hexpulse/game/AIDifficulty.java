@@ -30,13 +30,13 @@ public enum AIDifficulty {
     public int getSearchDepth() {
         switch (this) {
             case EASY:
-                return 1;
+                return 3;   // Strategic depth for competent play
             case MEDIUM:
-                return 2;
+                return 5;   // Good tactical awareness
             case HARD:
-                return 3;
+                return 7;   // Deep strategic planning
             default:
-                return 2;
+                return 4;
         }
     }
     
@@ -46,13 +46,52 @@ public enum AIDifficulty {
     public int getMaxMovesToEvaluate() {
         switch (this) {
             case EASY:
-                return 5;
+                return 15;   // Solid move evaluation
             case MEDIUM:
-                return 10;
+                return 25;   // Comprehensive search
             case HARD:
-                return 15;
+                return 40;   // Exhaustive analysis
             default:
-                return 10;
+                return 20;
+        }
+    }
+    
+    /**
+     * Get randomness factor for move selection
+     */
+    public double getRandomnessFactor() {
+        switch (this) {
+            case EASY:
+                return 0.08;  // 8% random moves for some unpredictability
+            case MEDIUM:
+                return 0.02;  // 2% random moves to avoid perfect play  
+            case HARD:
+                return 0.0;   // No random moves - pure strategic play
+            default:
+                return 0.05;
+        }
+    }
+    
+    /**
+     * Get evaluation complexity factor
+     */
+    public boolean useAdvancedEvaluation() {
+        return this == MEDIUM || this == HARD;
+    }
+    
+    /**
+     * Get time limit for move calculation (milliseconds)
+     */
+    public long getTimeLimit() {
+        switch (this) {
+            case EASY:
+                return 800;    // Fast response
+            case MEDIUM:
+                return 1500;   // Quick but thorough
+            case HARD:
+                return 2500;   // Deep analysis but responsive
+            default:
+                return 1200;
         }
     }
 }

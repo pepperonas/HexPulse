@@ -38,10 +38,8 @@ public class HomeFragment extends Fragment {
             Navigation.findNavController(v).navigate(R.id.nav_online_game);
         });
         
-        binding.btnNewGame.setOnClickListener(v -> {
-            Bundle args = new Bundle();
-            args.putString("game_mode", "NEW");
-            Navigation.findNavController(v).navigate(R.id.nav_gallery, args);
+        binding.btnSettings.setOnClickListener(v -> {
+            Navigation.findNavController(v).navigate(R.id.nav_slideshow);
         });
 
         return root;

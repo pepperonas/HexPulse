@@ -60,11 +60,11 @@
             style="@style/AbaloneButton" />
 
         <Button
-            android:id="@+id/btn_new_game"
+            android:id="@+id/btn_settings"
             android:layout_width="match_parent"
             android:layout_height="60dp"
             android:layout_marginBottom="16dp"
-            android:text="@string/new_game"
+            android:text="@string/settings"
             android:textSize="18sp"
             style="@style/AbaloneButton" />
 

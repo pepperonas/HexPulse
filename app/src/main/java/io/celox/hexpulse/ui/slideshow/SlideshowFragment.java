@@ -49,10 +49,10 @@ public class SlideshowFragment extends Fragment {
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 requireContext(),
-                android.R.layout.simple_spinner_item,
+                io.celox.hexpulse.R.layout.spinner_item,
                 difficultyNames
         );
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        adapter.setDropDownViewResource(io.celox.hexpulse.R.layout.spinner_dropdown_item);
         binding.spinnerAiDifficulty.setAdapter(adapter);
 
         // Set current selection
@@ -88,10 +88,10 @@ public class SlideshowFragment extends Fragment {
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 requireContext(),
-                android.R.layout.simple_spinner_item,
+                io.celox.hexpulse.R.layout.spinner_item,
                 themeNames
         );
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        adapter.setDropDownViewResource(io.celox.hexpulse.R.layout.spinner_dropdown_item);
         binding.spinnerTheme.setAdapter(adapter);
 
         // Set current selection

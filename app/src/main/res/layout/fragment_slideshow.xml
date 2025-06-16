@@ -55,7 +55,7 @@
                 android:id="@+id/spinner_ai_difficulty"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="@color/background_dark"
+                android:background="@drawable/spinner_background"
                 android:layout_marginBottom="8dp" />
 
         </LinearLayout>
@@ -90,7 +90,7 @@
                 android:id="@+id/spinner_theme"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="@color/background_dark"
+                android:background="@drawable/spinner_background"
                 android:layout_marginBottom="8dp" />
 
         </LinearLayout>
