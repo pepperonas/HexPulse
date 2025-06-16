@@ -32,6 +32,10 @@ import io.celox.hexpulse.ui.views.HexagonalBoardView;
 import io.celox.hexpulse.debug.DebugLogger;
 
 import android.widget.PopupMenu;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.os.Handler;
+import android.os.Looper;
 
 public class GalleryFragment extends Fragment implements HexagonalBoardView.BoardTouchListener, GameClient.GameEventListener {
 
@@ -189,10 +193,9 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
         if (winner != null) {
             String winnerText = getString(R.string.game_winner, 
                 winner == Player.BLACK ? getString(R.string.black_player) : getString(R.string.white_player));
-            binding.textWinner.setText(winnerText);
-            binding.textWinner.setVisibility(View.VISIBLE);
+            showWinnerAnimation(winnerText);
         } else {
-            binding.textWinner.setVisibility(View.GONE);
+            binding.winnerContainer.setVisibility(View.GONE);
         }
 
         // Update board
@@ -398,6 +401,27 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     private void resetGame() {
         if (game != null) {
             game.resetGame();
+            
+            // Hide winner animations
+            if (binding != null) {
+                binding.winnerContainer.setVisibility(View.GONE);
+                binding.trophyIcon.setVisibility(View.GONE);
+                binding.confetti1.setVisibility(View.GONE);
+                binding.confetti2.setVisibility(View.GONE);
+                binding.confetti3.setVisibility(View.GONE);
+                binding.confetti4.setVisibility(View.GONE);
+                binding.confetti5.setVisibility(View.GONE);
+                
+                // Clear animations
+                binding.textWinner.clearAnimation();
+                binding.trophyIcon.clearAnimation();
+                binding.confetti1.clearAnimation();
+                binding.confetti2.clearAnimation();
+                binding.confetti3.clearAnimation();
+                binding.confetti4.clearAnimation();
+                binding.confetti5.clearAnimation();
+            }
+            
             updateUI();
             updateUndoButton();
             updateDebugButton();
@@ -523,6 +547,77 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
             // Show/hide Log Critical Move button based on debug mode
             binding.btnLogCriticalMove.setVisibility(debugModeEnabled ? View.VISIBLE : View.GONE);
         }
+    }
+    
+    private void showWinnerAnimation(String winnerText) {
+        if (binding == null) return;
+        
+        // Set winner text
+        binding.textWinner.setText(winnerText);
+        
+        // Show winner container
+        binding.winnerContainer.setVisibility(View.VISIBLE);
+        
+        // Load animations
+        Animation slideInAnim = AnimationUtils.loadAnimation(getContext(), R.anim.winner_slide_in);
+        Animation bounceAnim = AnimationUtils.loadAnimation(getContext(), R.anim.winner_scale_bounce);
+        Animation pulseAnim = AnimationUtils.loadAnimation(getContext(), R.anim.winner_pulse);
+        Animation confettiAnim = AnimationUtils.loadAnimation(getContext(), R.anim.confetti_fall);
+        
+        // Start winner text animation
+        binding.textWinner.startAnimation(slideInAnim);
+        
+        // Show and animate trophy after a delay
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (binding != null) {
+                binding.trophyIcon.setVisibility(View.VISIBLE);
+                binding.trophyIcon.startAnimation(bounceAnim);
+                
+                // Start pulsing animation for winner text
+                binding.textWinner.startAnimation(pulseAnim);
+            }
+        }, 600);
+        
+        // Show confetti after another delay
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (binding != null) {
+                startConfettiAnimation(confettiAnim);
+            }
+        }, 1000);
+    }
+    
+    private void startConfettiAnimation(Animation confettiAnim) {
+        // Animate confetti pieces with staggered timing
+        binding.confetti1.setVisibility(View.VISIBLE);
+        binding.confetti1.startAnimation(confettiAnim);
+        
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (binding != null) {
+                binding.confetti2.setVisibility(View.VISIBLE);
+                binding.confetti2.startAnimation(confettiAnim);
+            }
+        }, 200);
+        
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (binding != null) {
+                binding.confetti3.setVisibility(View.VISIBLE);
+                binding.confetti3.startAnimation(confettiAnim);
+            }
+        }, 400);
+        
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (binding != null) {
+                binding.confetti4.setVisibility(View.VISIBLE);
+                binding.confetti4.startAnimation(confettiAnim);
+            }
+        }, 600);
+        
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (binding != null) {
+                binding.confetti5.setVisibility(View.VISIBLE);
+                binding.confetti5.startAnimation(confettiAnim);
+            }
+        }, 800);
     }
     
     private void logCriticalMove() {
@@ -815,6 +910,8 @@ public class GalleryFragment extends Fragment implements HexagonalBoardView.Boar
     public void onGameEnded(String winner, JSONObject scores) {
         if (getActivity() != null) {
             getActivity().runOnUiThread(() -> {
+                String winnerText = "Game Over! Winner: " + winner;
+                showWinnerAnimation(winnerText);
                 Toast.makeText(getContext(), "Game ended! Winner: " + winner, Toast.LENGTH_LONG).show();
                 updateUI();
             });

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:repeatCount="3">
+    
+    <!-- Falling motion -->
+    <translate
+        android:fromYDelta="-20%"
+        android:toYDelta="100%"
+        android:duration="2000"
+        android:interpolator="@android:anim/accelerate_interpolator" />
+        
+    <!-- Rotation for confetti effect -->
+    <rotate
+        android:fromDegrees="0"
+        android:toDegrees="360"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:duration="2000"
+        android:interpolator="@android:anim/linear_interpolator" />
+        
+    <!-- Alpha fade -->
+    <alpha
+        android:fromAlpha="1.0"
+        android:toAlpha="0.0"
+        android:duration="2000"
+        android:interpolator="@android:anim/accelerate_interpolator" />
+        
+</set>

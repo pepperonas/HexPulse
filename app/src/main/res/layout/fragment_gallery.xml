@@ -150,20 +150,90 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Winner Announcement -->
-    <TextView
-        android:id="@+id/text_winner"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@color/accent_primary"
-        android:padding="24dp"
-        android:textColor="@color/text_primary"
-        android:textSize="24sp"
-        android:textStyle="bold"
+    <!-- Winner Announcement Container -->
+    <FrameLayout
+        android:id="@+id/winner_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:visibility="gone"
+        android:background="#80000000"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Confetti Elements -->
+        <View
+            android:id="@+id/confetti_1"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginStart="50dp"
+            android:layout_marginTop="20dp"
+            android:background="@color/accent_primary"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/confetti_2"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:layout_marginStart="150dp"
+            android:layout_marginTop="30dp"
+            android:background="@color/marble_black"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/confetti_3"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_marginStart="250dp"
+            android:layout_marginTop="15dp"
+            android:background="@color/marble_white"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/confetti_4"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginStart="350dp"
+            android:layout_marginTop="25dp"
+            android:background="@color/accent_primary"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/confetti_5"
+            android:layout_width="7dp"
+            android:layout_height="7dp"
+            android:layout_marginStart="120dp"
+            android:layout_marginTop="10dp"
+            android:background="@color/marble_black"
+            android:visibility="gone" />
+
+        <!-- Winner Text -->
+        <TextView
+            android:id="@+id/text_winner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@color/accent_primary"
+            android:padding="32dp"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textAlignment="center"
+            android:elevation="8dp"
+            android:layout_margin="32dp" />
+
+        <!-- Trophy Icon -->
+        <TextView
+            android:id="@+id/trophy_icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal|top"
+            android:layout_marginTop="80dp"
+            android:text="🏆"
+            android:textSize="64sp"
+            android:visibility="gone" />
+
+    </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
