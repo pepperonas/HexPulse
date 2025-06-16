@@ -594,7 +594,7 @@ public class HexagonalBoardView extends View {
     }
     
     /**
-     * Draw movement preview with yellow arrows from selected marbles to possible destinations
+     * Draw movement preview with yellow arrows showing actual movement direction
      */
     private void drawMovementPreview(Canvas canvas) {
         if (game == null || game.getSelectedMarbles().isEmpty() || game.getValidMoves().isEmpty()) {
@@ -604,39 +604,51 @@ public class HexagonalBoardView extends View {
         List<Hex> selectedMarbles = game.getSelectedMarbles();
         Set<Hex> validMoves = game.getValidMoves();
         
-        // Draw yellow arrows from each selected marble to each valid move target
-        for (Hex marble : selectedMarbles) {
-            for (Hex target : validMoves) {
-                // Check if this marble can actually move to this target
-                if (canMarbleReachTarget(marble, target, selectedMarbles)) {
-                    drawYellowArrow(canvas, marble, target);
-                }
+        // For each valid move, determine which marbles will actually move there
+        for (Hex target : validMoves) {
+            // Find the movement direction for this target
+            Integer direction = findMoveDirectionForTarget(selectedMarbles, target);
+            if (direction != null) {
+                // Draw arrows only for marbles that will actually move
+                drawMovementArrowsForDirection(canvas, selectedMarbles, target, direction);
             }
         }
     }
     
     /**
-     * Check if a marble can move to a specific target based on game rules
+     * Find the movement direction for a specific target
      */
-    private boolean canMarbleReachTarget(Hex marble, Hex target, List<Hex> selectedMarbles) {
-        // For single marble, check if target is adjacent
-        if (selectedMarbles.size() == 1) {
-            for (int dir = 0; dir < 6; dir++) {
-                if (marble.neighbor(dir).equals(target)) {
-                    return true;
-                }
-            }
-        } else {
-            // For multiple marbles moving together, check if marble can reach target
-            // This is simplified - in reality we'd need to check the exact movement pattern
-            for (int dir = 0; dir < 6; dir++) {
+    private Integer findMoveDirectionForTarget(List<Hex> selectedMarbles, Hex target) {
+        if (selectedMarbles.isEmpty()) return null;
+        
+        // Check all 6 directions
+        for (int dir = 0; dir < 6; dir++) {
+            // Check if moving in this direction would result in any marble reaching the target
+            for (Hex marble : selectedMarbles) {
                 Hex nextPos = marble.neighbor(dir);
                 if (nextPos.equals(target)) {
-                    return true;
+                    return dir;
                 }
             }
         }
-        return false;
+        return null;
+    }
+    
+    /**
+     * Draw movement arrows for a specific direction
+     */
+    private void drawMovementArrowsForDirection(Canvas canvas, List<Hex> selectedMarbles, Hex target, int direction) {
+        // Only draw arrows for marbles that will actually move to create this target
+        for (Hex marble : selectedMarbles) {
+            Hex destination = marble.neighbor(direction);
+            
+            // For inline movement: all marbles move in same direction
+            // For broadside movement: marbles move to adjacent positions
+            // We'll draw arrow to the actual destination of each marble
+            if (game != null && game.isValidPosition(destination)) {
+                drawYellowArrow(canvas, marble, destination);
+            }
+        }
     }
     
     /**
